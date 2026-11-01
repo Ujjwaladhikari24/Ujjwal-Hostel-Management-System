@@ -1,0 +1,43 @@
+{% from 'partials/macros.html' import icon, logo %}
+<aside class="sidebar" aria-label="Student navigation">
+  <a class="brand" href="{{ url_for('student.dashboard') }}">
+    {{ logo() }}
+    <span class="brand-text">
+      <span class="brand-name">{{ hostel_name }}</span>
+      <span class="brand-sub">Student Portal</span>
+    </span>
+  </a>
+
+  <div class="nav-group">My hostel</div>
+  <nav class="nav-list">
+    <a class="nav-link {{ 'active' if active == 'dashboard' }}" {{ 'aria-current=page'|safe if active == 'dashboard' }} href="{{ url_for('student.dashboard') }}">{{ icon('layout-dashboard') }} Dashboard</a>
+    <a class="nav-link {{ 'active' if active == 'profile' }}" {{ 'aria-current=page'|safe if active == 'profile' }} href="{{ url_for('student.profile') }}">{{ icon('user-round') }} My Profile</a>
+    <a class="nav-link {{ 'active' if active == 'room' }}" {{ 'aria-current=page'|safe if active == 'room' }} href="{{ url_for('student.my_room') }}">{{ icon('bed-double') }} My Room</a>
+  </nav>
+
+  <div class="nav-group">Fees</div>
+  <nav class="nav-list">
+    <a class="nav-link {{ 'active' if active == 'fees' }}" {{ 'aria-current=page'|safe if active == 'fees' }} href="{{ url_for('student.fees') }}">{{ icon('receipt-indian-rupee') }} Fee Details</a>
+    <a class="nav-link {{ 'active' if active == 'payments' }}" {{ 'aria-current=page'|safe if active == 'payments' }} href="{{ url_for('student.payments') }}">{{ icon('history') }} Payment History</a>
+  </nav>
+
+  <div class="nav-group">Support</div>
+  <nav class="nav-list">
+    <a class="nav-link {{ 'active' if active == 'complaints' }}" {{ 'aria-current=page'|safe if active == 'complaints' }} href="{{ url_for('student.complaints') }}">
+      {{ icon('message-square-warning') }} Submit Complaint
+      {% if nav_my_complaints %}<span class="nav-count">{{ nav_my_complaints }}</span>{% endif %}
+    </a>
+    <a class="nav-link {{ 'active' if active == 'announcements' }}" {{ 'aria-current=page'|safe if active == 'announcements' }} href="{{ url_for('student.announcements') }}">{{ icon('megaphone') }} Announcements</a>
+    <a class="nav-link {{ 'active' if active == 'rules' }}" {{ 'aria-current=page'|safe if active == 'rules' }} href="{{ url_for('student.rules') }}">{{ icon('book-open-check') }} Hostel Rules</a>
+    <a class="nav-link {{ 'active' if active == 'contact' }}" {{ 'aria-current=page'|safe if active == 'contact' }} href="{{ url_for('student.contact') }}">{{ icon('mail') }} Contact Administration</a>
+  </nav>
+
+  <div class="sidebar-foot">
+    <div class="sidebar-card">
+      <strong>{{ academic_session }} Session</strong>
+      Need help? The warden's office is open Mon–Sat, 9 AM – 5:30 PM.
+    </div>
+    <a class="nav-link" style="margin-top:.5rem" href="{{ url_for('auth.logout') }}">{{ icon('log-out') }} Logout</a>
+  </div>
+</aside>
+<div class="nav-scrim"></div>

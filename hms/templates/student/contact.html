@@ -1,0 +1,67 @@
+{% extends "dashboard_base.html" %}
+{% from 'partials/macros.html' import icon, badge, empty %}
+{% block title %}Contact Administration — {{ hostel_name }}{% endblock %}
+{% block page_title %}Contact administration{% endblock %}
+{% block page_sub %}Message the hostel office directly{% endblock %}
+
+{% block page_content %}
+<div class="grid-2" style="align-items:start">
+  <section class="card" data-anim>
+    <div class="card-head"><h3>{{ icon('send') }} Send a message</h3></div>
+    <form class="card-body" method="post" action="{{ url_for('student.contact') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="field">
+        <label for="subject">Subject <span class="req">*</span></label>
+        <input id="subject" type="text" name="subject" required minlength="4" maxlength="150" placeholder="e.g. Request for early check-in next semester">
+      </div>
+      <div class="field">
+        <label for="message">Message <span class="req">*</span></label>
+        <textarea id="message" name="message" required minlength="10" maxlength="2000" placeholder="Write your message to the warden or office staff…"></textarea>
+      </div>
+      <div class="row-between">
+        <span class="tiny muted">{{ icon('info', 'i-sm') }} Sent from {{ student.user.email }}</span>
+        <button class="btn btn-primary" type="submit">{{ icon('send', 'i-sm') }} Send message</button>
+      </div>
+    </form>
+  </section>
+
+  <div class="stack">
+    <section class="card card-pad" data-anim>
+      <h3 style="font-size:.98rem">{{ icon('building-2') }} Hostel office</h3>
+      <div class="info-list">
+        <div class="info-row"><span class="k">Address</span><span class="v" style="max-width:60%">{{ address }}</span></div>
+        <div class="info-row"><span class="k">Email</span><span class="v"><a href="mailto:{{ email }}">{{ email }}</a></span></div>
+        <div class="info-row"><span class="k">Phone</span><span class="v"><a href="tel:{{ phone|replace(' ', '') }}">{{ phone }}</a></span></div>
+        <div class="info-row"><span class="k">Office hours</span><span class="v">{{ office_hours }}</span></div>
+      </div>
+      <div class="alert info" style="margin:1rem 0 0">
+        {{ icon('message-square-warning') }}
+        <div>For maintenance issues use <a href="{{ url_for('student.complaints') }}">Submit Complaint</a> so the ticket can be tracked and closed.</div>
+      </div>
+    </section>
+
+    <section class="card" data-anim>
+      <div class="card-head"><h3>{{ icon('history') }} My recent messages</h3></div>
+      {% if previous %}
+      <div class="card-body stack-sm">
+        {% for m in previous %}
+        <div class="row-between" style="align-items:flex-start">
+          <div>
+            <div style="font-weight:650;font-size:.87rem">{{ m.subject }}</div>
+            <div class="tiny muted">{{ m.message|truncate(80) }}</div>
+          </div>
+          <div class="right">
+            <div class="tiny muted nowrap">{{ m.created_at|date }}</div>
+            {{ badge('Read' if m.is_read else 'Sent', 'ok' if m.is_read else 'muted') }}
+          </div>
+        </div>
+        {% if not loop.last %}<hr class="sep" style="margin:.15rem 0">{% endif %}
+        {% endfor %}
+      </div>
+      {% else %}
+        {{ empty('inbox', 'No messages yet', 'Messages you send to the hostel office appear here.') }}
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

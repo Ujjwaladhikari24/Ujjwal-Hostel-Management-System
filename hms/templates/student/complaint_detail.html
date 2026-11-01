@@ -1,0 +1,100 @@
+{% extends "dashboard_base.html" %}
+{% from 'partials/macros.html' import icon, status_badge, badge, avatar %}
+{% block title %}{{ complaint.ticket_no }} — {{ hostel_name }}{% endblock %}
+{% block page_title %}Complaint {{ complaint.ticket_no }}{% endblock %}
+{% block page_sub %}{{ complaint.category }} · raised {{ complaint.created_at|date }}{% endblock %}
+
+{% block page_header %}
+<div class="page-head">
+  <div>
+    <div class="breadcrumb"><a href="{{ url_for('student.complaints') }}">Complaints</a> {{ icon('chevron-right') }} <span>{{ complaint.ticket_no }}</span></div>
+    <h1>{{ complaint.subject }}</h1>
+    <p>{{ complaint.category }} · {{ complaint.priority }} priority · raised {{ complaint.created_at|dt }}</p>
+  </div>
+  <div class="page-actions">{{ status_badge(complaint.status) }}</div>
+</div>
+{% endblock %}
+
+{% block page_content %}
+<div class="grid-2-1" style="align-items:start">
+  <div class="stack">
+    <section class="card" data-anim>
+      <div class="card-head">
+        <h3>{{ icon('message-square') }} Conversation</h3>
+        <span class="badge muted">{{ complaint.responses|length }} message(s)</span>
+      </div>
+      <div class="card-body">
+        <div class="chat">
+          <div class="bubble student">
+            <strong>{{ complaint.student.user.name }}</strong>
+            <div style="margin-top:.3rem">{{ complaint.description|nl2br }}</div>
+            {% if complaint.attachment %}
+              <div style="margin-top:.5rem">
+                <a class="btn btn-ghost btn-sm" href="{{ url_for('static', filename=complaint.attachment) }}" target="_blank" rel="noopener">{{ icon('paperclip', 'i-sm') }} View attachment</a>
+              </div>
+            {% endif %}
+            <div class="b-meta">{{ complaint.created_at|dt }}</div>
+          </div>
+          {% for r in complaint.responses %}
+          <div class="bubble {{ 'admin' if r.author and r.author.role == 'admin' else 'student' }}">
+            <strong>{{ r.author.name if r.author else 'Hostel office' }}{% if r.author and r.author.role == 'admin' %} · {{ badge('Administration', 'brand') }}{% endif %}</strong>
+            <div style="margin-top:.3rem">{{ r.message|nl2br }}</div>
+            <div class="b-meta">{{ r.created_at|dt }}</div>
+          </div>
+          {% endfor %}
+        </div>
+
+        {% if complaint.status != 'Rejected' %}
+        <form method="post" action="{{ url_for('student.complaint_reply', complaint_id=complaint.id) }}" style="margin-top:1.2rem">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="field">
+            <label for="message">Add a reply <span class="hint">(visible to the hostel office)</span></label>
+            <textarea id="message" name="message" required minlength="3" maxlength="2000" placeholder="Add more detail or answer a question…"></textarea>
+          </div>
+          <button class="btn btn-primary" type="submit">{{ icon('send', 'i-sm') }} Send reply</button>
+        </form>
+        {% else %}
+          <div class="alert warning" style="margin-top:1rem;margin-bottom:0">{{ icon('lock') }} This complaint was closed as rejected and no longer accepts replies. Contact the office if you disagree.</div>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="card card-pad" data-anim>
+      <h3 style="font-size:.98rem">{{ icon('info') }} Ticket details</h3>
+      <div class="info-list">
+        <div class="info-row"><span class="k">Ticket no.</span><span class="v mono">{{ complaint.ticket_no }}</span></div>
+        <div class="info-row"><span class="k">Category</span><span class="v">{{ complaint.category }}</span></div>
+        <div class="info-row"><span class="k">Priority</span><span class="v">{{ complaint.priority }}</span></div>
+        <div class="info-row"><span class="k">Status</span><span class="v">{{ status_badge(complaint.status) }}</span></div>
+        <div class="info-row"><span class="k">Submitted</span><span class="v">{{ complaint.created_at|dt }}</span></div>
+        <div class="info-row"><span class="k">Last update</span><span class="v">{{ complaint.updated_at|dt }}</span></div>
+        {% if complaint.resolved_at %}
+        <div class="info-row"><span class="k">Resolved in</span><span class="v">{{ complaint.resolution_hours }} hours</span></div>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="card card-pad" data-anim>
+      <h3 style="font-size:.98rem">{{ icon('route') }} Progress</h3>
+      <div class="timeline">
+        <div class="timeline-item ok">
+          <div class="t-what">Complaint submitted</div>
+          <div class="t-when">{{ complaint.created_at|dt }}</div>
+        </div>
+        <div class="timeline-item {{ 'ok' if complaint.status in ['In Progress', 'Resolved', 'Rejected'] else '' }}">
+          <div class="t-what">Picked up by hostel office</div>
+          <div class="t-when">{{ 'In progress' if complaint.status == 'In Progress' else ('Done' if complaint.status in ['Resolved','Rejected'] else 'Waiting') }}</div>
+        </div>
+        <div class="timeline-item {{ 'ok' if complaint.status == 'Resolved' else ('warn' if complaint.status == 'Rejected' else '') }}">
+          <div class="t-what">{{ 'Resolved' if complaint.status == 'Resolved' else ('Rejected' if complaint.status == 'Rejected' else 'Resolution pending') }}</div>
+          <div class="t-when">{{ complaint.resolved_at|dt if complaint.resolved_at else '—' }}</div>
+        </div>
+      </div>
+    </section>
+
+    <a class="btn btn-outline btn-block" href="{{ url_for('student.complaints') }}">{{ icon('arrow-left', 'i-sm') }} Back to all complaints</a>
+  </div>
+</div>
+{% endblock %}

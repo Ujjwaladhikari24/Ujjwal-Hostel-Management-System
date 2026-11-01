@@ -1,0 +1,51 @@
+{% extends "dashboard_base.html" %}
+{% from 'partials/macros.html' import icon, badge %}
+{% block title %}Hostel Rules — {{ hostel_name }}{% endblock %}
+{% block page_title %}Hostel rules &amp; help{% endblock %}
+{% block page_sub %}Stay compliant, stay comfortable{% endblock %}
+
+{% block page_content %}
+<div class="grid-2-1" style="align-items:start">
+  <section class="card" data-anim>
+    <div class="card-head"><h3>{{ icon('book-open-check') }} House rules</h3><span class="badge muted">{{ rules|length }} rules</span></div>
+    <div class="card-body stack-sm">
+      {% for title, text in rules %}
+      <div class="rule" style="box-shadow:none">
+        <div class="r-num">{{ '%02d'|format(loop.index) }}</div>
+        <div><h4>{{ title }}</h4><p>{{ text }}</p></div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <div class="stack">
+    <section class="card card-pad" data-anim>
+      <h3 style="font-size:.98rem">{{ icon('alert-triangle') }} Fee policy</h3>
+      <p class="tiny muted">{{ late_fee_note or 'Fees must be paid by the notified due date.' }}</p>
+      <a class="btn btn-outline btn-block btn-sm" href="{{ url_for('student.fees') }}">{{ icon('receipt-indian-rupee', 'i-sm') }} See my dues</a>
+    </section>
+
+    <section class="card" data-anim>
+      <div class="card-head"><h3>{{ icon('circle-help') }} Help &amp; FAQ</h3></div>
+      <div class="card-body">
+        {% for q, a in faqs %}
+        <details class="faq" {{ 'open' if loop.first }}>
+          <summary>{{ q }}</summary>
+          <div class="faq-body">{{ a }}</div>
+        </details>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="card card-pad" data-anim>
+      <h3 style="font-size:.98rem">{{ icon('phone') }} Emergency contacts</h3>
+      <div class="info-list">
+        <div class="info-row"><span class="k">Warden office</span><span class="v">{{ hostel_phone }}</span></div>
+        <div class="info-row"><span class="k">Security desk</span><span class="v">Ext. 112</span></div>
+        <div class="info-row"><span class="k">Medical room</span><span class="v">Ext. 108</span></div>
+        <div class="info-row"><span class="k">Email</span><span class="v">{{ hostel_email }}</span></div>
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}

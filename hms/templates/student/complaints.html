@@ -1,0 +1,120 @@
+{% extends "dashboard_base.html" %}
+{% from 'partials/macros.html' import icon, status_badge, empty, badge %}
+{% block title %}Complaints — {{ hostel_name }}{% endblock %}
+{% block page_title %}Complaints{% endblock %}
+{% block page_sub %}Raise and track maintenance or service issues{% endblock %}
+
+{% block page_header %}
+<div class="page-head">
+  <div>
+    <div class="breadcrumb"><a href="{{ url_for('student.dashboard') }}">Dashboard</a> {{ icon('chevron-right') }} <span>Complaints</span></div>
+    <h1>Complaints &amp; requests</h1>
+    <p>Every ticket is logged with a number so nothing gets lost.</p>
+  </div>
+  <div class="page-actions">
+    <button class="btn btn-primary" data-modal-open="complaintModal">{{ icon('plus') }} New complaint</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_content %}
+<div class="stat-strip" data-anim>
+  <div class="stat-mini"><div class="l">Pending</div><div class="v" style="color:#b45309">{{ counts['Pending'] }}</div></div>
+  <div class="stat-mini"><div class="l">In progress</div><div class="v" style="color:#0369a1">{{ counts['In Progress'] }}</div></div>
+  <div class="stat-mini"><div class="l">Resolved</div><div class="v" style="color:#047857">{{ counts['Resolved'] }}</div></div>
+  <div class="stat-mini"><div class="l">Rejected</div><div class="v" style="color:#b91c1c">{{ counts['Rejected'] }}</div></div>
+</div>
+
+<section class="card" data-anim>
+  <div class="card-head">
+    <h3>{{ icon('list-filter') }} My complaints</h3>
+    <form class="filters" method="get" action="{{ url_for('student.complaints') }}" data-autosubmit>
+      <input type="search" name="q" value="{{ q }}" placeholder="Search subject…" aria-label="Search complaints">
+      <select name="status" aria-label="Filter by status">
+        <option value="">All statuses</option>
+        {% for s in ['Pending', 'In Progress', 'Resolved', 'Rejected'] %}
+          <option value="{{ s }}" {{ 'selected' if status_filter == s }}>{{ s }}</option>
+        {% endfor %}
+      </select>
+      <select name="category" aria-label="Filter by category">
+        <option value="">All categories</option>
+        {% for c in categories %}<option value="{{ c }}" {{ 'selected' if category_filter == c }}>{{ c }}</option>{% endfor %}
+      </select>
+      <button class="btn btn-outline btn-sm" type="submit">{{ icon('search', 'i-sm') }} Filter</button>
+      {% if q or status_filter or category_filter %}
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('student.complaints') }}">Reset</a>
+      {% endif %}
+    </form>
+  </div>
+
+  {% if rows %}
+  <div class="table-wrap">
+    <table class="data">
+      <thead><tr><th>Ticket</th><th>Subject</th><th>Category</th><th>Raised</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        {% for c in rows %}
+        <tr>
+          <td class="mono tiny">{{ c.ticket_no }}</td>
+          <td class="t-title">{{ c.subject }}
+            <div class="t-sub">{{ c.responses|length }} message(s) · priority {{ c.priority }}</div>
+          </td>
+          <td>{{ badge(c.category, 'brand') }}</td>
+          <td class="tiny">{{ c.created_at|dt }}</td>
+          <td>{{ status_badge(c.status) }}</td>
+          <td class="right"><a class="btn btn-outline btn-sm" href="{{ url_for('student.complaint_detail', complaint_id=c.id) }}">Open</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    {{ empty('inbox', 'No complaints match', 'Try clearing the filters, or submit a new complaint with the button above.') }}
+  {% endif %}
+</section>
+
+<!-- ===================== new complaint modal ===================== -->
+<dialog class="modal" id="complaintModal">
+  <form method="post" action="{{ url_for('student.complaints') }}" enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="modal-head">
+      <h3>{{ icon('plus-circle') }} Submit a complaint</h3>
+      <button class="icon-btn" type="button" data-modal-close aria-label="Close">{{ icon('x') }}</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="field">
+          <label for="category">Category <span class="req">*</span></label>
+          <select id="category" name="category" required>
+            {% for c in categories %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="priority">Priority</label>
+          <select id="priority" name="priority">
+            <option value="Low">Low — can wait</option>
+            <option value="Normal" selected>Normal</option>
+            <option value="High">High — urgent</option>
+          </select>
+        </div>
+        <div class="field full">
+          <label for="subject">Subject <span class="req">*</span></label>
+          <input id="subject" type="text" name="subject" required minlength="5" maxlength="150" placeholder="e.g. Ceiling fan not working in room 204">
+        </div>
+        <div class="field full">
+          <label for="description">Description <span class="req">*</span></label>
+          <textarea id="description" name="description" required minlength="15" maxlength="3000" placeholder="Describe the problem, when it started and anything the maintenance team should know."></textarea>
+        </div>
+        <div class="field full">
+          <label for="attachment">Photo or PDF (optional)</label>
+          <input id="attachment" type="file" name="attachment" accept="image/png,image/jpeg,image/webp,application/pdf">
+          <span class="hint">A photo usually speeds up resolution · max 4 MB</span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" type="button" data-modal-close>Cancel</button>
+      <button class="btn btn-primary" type="submit">{{ icon('send', 'i-sm') }} Submit complaint</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}

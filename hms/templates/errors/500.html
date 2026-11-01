@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% from 'partials/macros.html' import icon %}
+{% block title %}500 — Something went wrong{% endblock %}
+{% block content %}
+<div class="container" style="min-height:80vh;display:grid;place-items:center;text-align:center">
+  <div style="max-width:560px">
+    <div class="empty-icon" style="width:84px;height:84px;border-radius:26px;display:grid;place-items:center;margin:0 auto 1.2rem;background:linear-gradient(135deg,rgba(249,115,22,.15),rgba(239,68,68,.14));color:#f97316">{{ icon('wrench', 'i-xl') }}</div>
+    <span class="eyebrow center">500 · Server error</span>
+    <h1>The server hit an unexpected problem</h1>
+    <p class="muted">The transaction was rolled back so no partial data was saved. Please retry; if it keeps happening, note what you were doing and inform the hostel office.</p>
+    <div class="row center" style="justify-content:center;gap:.6rem;margin-top:1.4rem">
+      <a class="btn btn-primary" href="{{ request.referrer or url_for('public.home') }}">{{ icon('rotate-ccw') }} Go back</a>
+      <a class="btn btn-outline" href="{{ url_for('public.home') }}">{{ icon('home') }} Homepage</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

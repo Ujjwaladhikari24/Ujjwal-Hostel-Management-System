@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% from 'partials/macros.html' import icon, logo %}
+{% block title %}Receipt {{ payment.receipt_no }} — {{ hostel_name }}{% endblock %}
+
+{% block content %}
+<div style="padding:1.5rem">
+  <div class="row-between no-print" style="max-width:720px;margin:0 auto 1rem">
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.payments') }}">{{ icon('arrow-left', 'i-sm') }} Back to payments</a>
+    <div class="row" style="gap:.5rem">
+      <button class="btn btn-outline btn-sm" onclick="window.print()">{{ icon('printer', 'i-sm') }} Print</button>
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.student_detail', student_id=student.id) }}">{{ icon('user-round', 'i-sm') }} Student profile</a>
+    </div>
+  </div>
+
+  <div class="receipt-paper">
+    <div class="r-head">
+      <div class="row" style="gap:.7rem">
+        {{ logo('logo') }}
+        <div>
+          <div style="font-weight:800;font-size:1.05rem">{{ hostel_name }}</div>
+          <div style="font-size:.76rem;color:#6b7a99">{{ hostel_address }}</div>
+          <div style="font-size:.76rem;color:#6b7a99">{{ hostel_email }} · {{ hostel_phone }}</div>
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div class="receipt-stamp">Payment received</div>
+        <div style="font-size:.78rem;margin-top:.5rem;color:#6b7a99">Receipt no.</div>
+        <div style="font-weight:800">{{ payment.receipt_no }}</div>
+      </div>
+    </div>
+
+    <table>
+      <tr><th style="width:38%">Student</th><td>{{ student.user.name }}</td></tr>
+      <tr><th>Enrollment no.</th><td>{{ student.enrollment_no }}</td></tr>
+      <tr><th>Course / year</th><td>{{ student.course or '—' }} · {{ student.year or '—' }}</td></tr>
+      <tr><th>Room</th><td>{{ student.room.room_number if student.room else 'Not allocated' }}</td></tr>
+      <tr><th>Fee head</th><td>{{ payment.fee_record.title if payment.fee_record else 'General hostel payment' }}</td></tr>
+      <tr><th>Payment date</th><td>{{ payment.paid_on|date }}</td></tr>
+      <tr><th>Method</th><td>{{ payment.method }}{% if payment.reference %} · Ref {{ payment.reference }}{% endif %}</td></tr>
+      <tr><th>Amount received</th><td style="font-weight:800;font-size:1.05rem">₹{{ '{:,.2f}'.format(payment.amount) }}</td></tr>
+      <tr><th>Outstanding after payment</th><td>₹{{ '{:,.2f}'.format(student.balance) }}</td></tr>
+      <tr><th>Recorded by</th><td>{{ payment.recorder.name if payment.recorder else 'Hostel office' }} · {{ payment.created_at|dt }}</td></tr>
+      {% if payment.note %}<tr><th>Note</th><td>{{ payment.note }}</td></tr>{% endif %}
+    </table>
+
+    <div style="margin-top:1.2rem;display:flex;justify-content:space-between;gap:1rem;align-items:flex-end">
+      <p style="font-size:.74rem;color:#8296b5;max-width:44ch;margin:0">
+        Computer-generated receipt for a manually recorded payment. No online payment gateway was involved.
+      </p>
+      <div style="text-align:center">
+        <div style="height:34px"></div>
+        <div style="border-top:1px solid #cdd8ea;padding-top:.3rem;font-size:.74rem;color:#6b7a99">Authorised signatory</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

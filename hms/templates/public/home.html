@@ -1,0 +1,412 @@
+{% extends "base.html" %}
+{% from 'partials/macros.html' import icon, logo, badge %}
+
+{% block title %}{{ hostel_name }} — Smart Hostel Management System{% endblock %}
+
+{% block content %}
+<header class="site-header">
+  <div class="container">
+    <nav class="site-nav">
+      <a href="{{ url_for('public.home') }}" class="brand brand-dark" style="padding:0;border:0;margin:0">
+        {{ logo() }}
+        <span class="brand-text">
+          <span class="brand-name">{{ hostel_name }}</span>
+          <span class="brand-sub">Hostel Management</span>
+        </span>
+      </a>
+      <div class="site-links">
+        <a href="#home">Home</a>
+        <a href="#about">About</a>
+        <a href="#facilities">Facilities</a>
+        <a href="#rooms">Rooms</a>
+        <a href="#rules">Rules</a>
+        <a href="#faq">FAQ</a>
+        <a href="#contact">Contact</a>
+      </div>
+      <div class="site-actions">
+        <button class="icon-btn" data-theme-toggle type="button" aria-label="Toggle theme" title="Light / dark mode"><i data-lucide="moon" class="i-lg" data-theme-icon></i></button>
+        <a class="btn btn-ghost btn-sm hide-sm" href="{{ url_for('auth.admin_login') }}">{{ icon('shield-check', 'i-sm') }} Admin</a>
+        <a class="btn btn-primary btn-sm" href="{{ url_for('auth.login') }}">{{ icon('log-in', 'i-sm') }} Student Login</a>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<!-- ============================= HERO ============================= -->
+<section class="hero" id="home">
+  <div class="container">
+    <div class="hero-grid">
+      <div>
+        <span class="eyebrow">Hostel operations, reimagined</span>
+        <h1>Smart Hostel Management.<br><span class="hl">Comfortable Living.</span><br>Better Experiences.</h1>
+        <p class="lead">
+          One portal for room allocation, hostel fees, maintenance complaints and notices —
+          for residents and wardens alike. No spreadsheets, no queues at the office.
+        </p>
+        <div class="hero-cta">
+          {% if registration_open %}
+            <a class="btn btn-primary btn-lg" href="{{ url_for('auth.register') }}">{{ icon('user-plus') }} Apply for accommodation</a>
+          {% else %}
+            <a class="btn btn-primary btn-lg" href="{{ url_for('auth.login') }}">{{ icon('log-in') }} Student login</a>
+          {% endif %}
+          <a class="btn btn-outline btn-lg" href="#rooms">{{ icon('bed-double') }} Explore rooms</a>
+        </div>
+        <div class="hero-proof">
+          <div>
+            <div class="p-v">{{ stats.residents }}</div>
+            <div class="p-l">Residents</div>
+          </div>
+          <div>
+            <div class="p-v">{{ stats.rooms }}</div>
+            <div class="p-l">Rooms</div>
+          </div>
+          <div>
+            <div class="p-v">{{ stats.free_beds }}</div>
+            <div class="p-l">Free beds</div>
+          </div>
+          <div>
+            <div class="p-v">{{ stats.wardens }}</div>
+            <div class="p-l">Wardens</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-visual">
+        <div class="hero-photo">
+          <img src="{{ url_for('static', filename='img/hero.jpg') }}" alt="{{ hostel_name }} building" loading="eager">
+        </div>
+        <div class="hero-float f1">
+          <div class="fi" style="background:var(--grad-teal)">{{ icon('bed-single') }}</div>
+          <div>
+            <div class="fl">Beds available</div>
+            <div class="fv">{{ overview.free }} of {{ overview.capacity }}</div>
+          </div>
+        </div>
+        <div class="hero-float f2">
+          <div class="fi" style="background:var(--grad-orange)">{{ icon('gauge') }}</div>
+          <div>
+            <div class="fl">Occupancy</div>
+            <div class="fv">{{ overview.occupancy_pct }}%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= ABOUT ============================= -->
+<section class="section" id="about">
+  <div class="container">
+    <div class="grid-1-2" style="align-items:center;gap:2.4rem">
+      <div>
+        <img src="{{ url_for('static', filename='img/study.jpg') }}" alt="Study hall"
+             style="border-radius:24px;box-shadow:var(--shadow-lg);height:100%;min-height:280px;object-fit:cover">
+      </div>
+      <div>
+        <span class="eyebrow">About the hostel</span>
+        <h2>A home on campus, managed properly</h2>
+        <p class="soft">
+          {{ hostel_name }} houses students across single, double, triple and four-sharing rooms.
+          Every allocation, fee record and maintenance request is logged in this system, so
+          wardens always work from the same, up-to-date information — and residents always know
+          exactly where they stand.
+        </p>
+        <div class="feature-grid" style="margin-top:1.4rem;grid-template-columns:1fr 1fr">
+          <div class="feature" style="padding:1rem">
+            <div class="f-icon" style="background:var(--grad-brand);width:38px;height:38px;border-radius:11px">{{ icon('bed-double') }}</div>
+            <h3 style="font-size:.92rem">Capacity-safe allocation</h3>
+            <p>The system refuses any allocation that would exceed a room's beds — over-allocation is impossible.</p>
+          </div>
+          <div class="feature" style="padding:1rem">
+            <div class="f-icon" style="background:var(--grad-teal);width:38px;height:38px;border-radius:11px">{{ icon('clipboard-check') }}</div>
+            <h3 style="font-size:.92rem">Complaints that close</h3>
+            <p>Every ticket has an owner, a status and an audit trail, with response-time tracking.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= FACILITIES ============================= -->
+<section class="section alt" id="facilities">
+  <div class="container">
+    <div class="section-head center">
+      <span class="eyebrow center">Facilities</span>
+      <h2>Everything a resident needs, under one roof</h2>
+      <p>Well-maintained shared spaces, reliable connectivity and a support desk that actually responds.</p>
+    </div>
+    <div class="feature-grid">
+      {% for icon_name, title, text, color in facilities %}
+      <div class="feature" data-anim>
+        <div class="f-icon" style="background:linear-gradient(135deg, {{ color }}, {{ color }}cc)">{{ icon(icon_name, 'i-lg') }}</div>
+        <h3>{{ title }}</h3>
+        <p>{{ text }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- ============================= GALLERY ============================= -->
+<section class="section">
+  <div class="container">
+    <div class="section-title">
+      <div>
+        <span class="eyebrow">Inside {{ hostel_name }}</span>
+        <h2>Spaces built for living and learning</h2>
+      </div>
+      <a class="btn btn-outline btn-sm" href="#contact">{{ icon('calendar-check') }} Book a campus visit</a>
+    </div>
+    <div class="gallery">
+      <figure><img src="{{ url_for('static', filename='img/room-shared.jpg') }}" alt="Shared room"><figcaption>Shared rooms with study desks &amp; storage</figcaption></figure>
+      <figure><img src="{{ url_for('static', filename='img/dining.jpg') }}" alt="Dining hall"><figcaption>Mess &amp; dining hall</figcaption></figure>
+      <figure><img src="{{ url_for('static', filename='img/lounge.jpg') }}" alt="Common lounge"><figcaption>Common lounge</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= ROOMS ============================= -->
+<section class="section alt" id="rooms">
+  <div class="container">
+    <div class="section-title">
+      <div>
+        <span class="eyebrow">Accommodation</span>
+        <h2>Live room availability</h2>
+        <p class="muted" style="margin:.35rem 0 0;font-size:.9rem">
+          Figures below are read directly from the hostel database — updated the moment a bed is allocated or vacated.
+        </p>
+      </div>
+      <div class="row wrap">
+        {{ badge(overview.free ~ ' beds free', 'ok', true) }}
+        {{ badge(overview.occupied ~ ' occupied', 'info', true) }}
+        {{ badge(overview.rooms ~ ' rooms', 'muted', true) }}
+      </div>
+    </div>
+
+    {% if overview.types %}
+    <div class="room-type-grid">
+      {% for t in overview.types %}
+      <div class="room-type" data-anim>
+        <div class="rt-head">
+          <div class="row-between">
+            <strong>{{ t.type }}</strong>
+            {{ badge('Maintenance' if t.maintenance == t.rooms else 'Open', 'warn' if t.maintenance == t.rooms else 'ok', true) }}
+          </div>
+          <div class="rt-price" style="margin-top:.5rem">
+            {{ '₹%s'|format('{:,.0f}'.format(t.fee_min)) }}
+            <small>{% if t.fee_max != t.fee_min %}– ₹{{ '{:,.0f}'.format(t.fee_max) }}{% endif %} / semester</small>
+          </div>
+        </div>
+        <div class="rt-body">
+          <div class="rt-row"><span>{{ icon('door-open', 'i-sm') }} Rooms</span><strong>{{ t.rooms }}</strong></div>
+          <div class="rt-row"><span>{{ icon('bed-single', 'i-sm') }} Beds</span><strong>{{ t.capacity }}</strong></div>
+          <div class="rt-row"><span>{{ icon('check-circle-2', 'i-sm') }} Free now</span><strong style="color:#047857">{{ t.free }}</strong></div>
+          <div class="availability-bar" style="margin-top:.35rem">
+            <span style="width: {{ (t.occupied * 100 / t.capacity)|round|int if t.capacity else 0 }}%"></span>
+          </div>
+          <div class="tiny muted">{{ t.occupied }} of {{ t.capacity }} beds occupied</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+      <div class="card">
+        <div class="empty">
+          <div class="empty-icon">{{ icon('building-2', 'i-xl') }}</div>
+          <h4>Room inventory not published yet</h4>
+          <p>The hostel office has not added rooms to the system. Once rooms are created in the admin console, live availability appears here automatically.</p>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</section>
+
+<!-- ============================= RULES ============================= -->
+<section class="section" id="rules">
+  <div class="container">
+    <div class="section-head">
+      <span class="eyebrow">Hostel rules</span>
+      <h2>Simple rules, kept by everyone</h2>
+    </div>
+    <div class="rules-grid">
+      {% for title, text in rules %}
+      <div class="rule" data-anim>
+        <div class="r-num">{{ '%02d'|format(loop.index) }}</div>
+        <div>
+          <h4>{{ title }}</h4>
+          <p>{{ text }}</p>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- ============================= NOTICES ============================= -->
+{% if announcements %}
+<section class="section alt">
+  <div class="container">
+    <div class="section-title">
+      <div>
+        <span class="eyebrow">Notice board</span>
+        <h2>Latest hostel notices</h2>
+      </div>
+      <a class="btn btn-outline btn-sm" href="{{ url_for('auth.login') }}">{{ icon('log-in', 'i-sm') }} See all</a>
+    </div>
+    <div class="grid-3">
+      {% for a in announcements %}
+      <article class="card card-pad announce-card" data-anim>
+        <div class="row-between">
+          <span class="a-tag" style="color:var(--indigo)">{{ a.tag }}</span>
+          <span class="tiny muted">{{ a.created_at|date }}</span>
+        </div>
+        <h3 style="margin:.5rem 0 .3rem;font-size:1rem">{{ a.title }}</h3>
+        <p class="muted" style="font-size:.86rem;margin:0">{{ a.body|truncate(150) }}</p>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- ============================= FAQ ============================= -->
+<section class="section" id="faq">
+  <div class="container">
+    <div class="grid-1-2" style="gap:2.5rem;align-items:start">
+      <div>
+        <span class="eyebrow">FAQ</span>
+        <h2>Frequently asked questions</h2>
+        <p class="muted">Still unsure about something? Send the hostel office a message below — we reply on working days.</p>
+        <a class="btn btn-outline" href="#contact">{{ icon('mail') }} Ask a question</a>
+      </div>
+      <div>
+        {% for q, a in faqs %}
+        <details class="faq" {% if loop.first %}open{% endif %}>
+          <summary>{{ q }}</summary>
+          <div class="faq-body">{{ a }}</div>
+        </details>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= CONTACT ============================= -->
+<section class="section alt" id="contact">
+  <div class="container">
+    <div class="grid-2" style="gap:2rem;align-items:start">
+      <div>
+        <span class="eyebrow">Contact</span>
+        <h2>Talk to the hostel office</h2>
+        <p class="soft">Wardens and office staff are available through the week. Residents can also raise tickets directly from the student portal.</p>
+        <div class="card card-pad" style="margin-top:1.2rem">
+          <div class="info-list">
+            <div class="info-row"><span class="k">{{ icon('map-pin', 'i-sm') }} Address</span><span class="v" style="max-width:60%">{{ hostel_address }}</span></div>
+            <div class="info-row"><span class="k">{{ icon('mail', 'i-sm') }} Email</span><span class="v"><a href="mailto:{{ hostel_email }}">{{ hostel_email }}</a></span></div>
+            <div class="info-row"><span class="k">{{ icon('phone', 'i-sm') }} Phone</span><span class="v"><a href="tel:{{ hostel_phone|replace(' ', '') }}">{{ hostel_phone }}</a></span></div>
+            <div class="info-row"><span class="k">{{ icon('clock', 'i-sm') }} Office hours</span><span class="v">Mon – Sat, 9:00 AM – 5:30 PM</span></div>
+          </div>
+        </div>
+      </div>
+
+      <form class="card card-pad" method="post" action="{{ url_for('public.contact') }}" data-validate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <h3 style="margin-bottom:1rem">{{ icon('send') }} Send a message</h3>
+        <div class="form-grid">
+          <div class="field">
+            <label for="c-name">Your name <span class="req">*</span></label>
+            <input id="c-name" type="text" name="name" required maxlength="120" placeholder="Full name">
+          </div>
+          <div class="field">
+            <label for="c-email">Email <span class="req">*</span></label>
+            <input id="c-email" type="email" name="email" required maxlength="190" placeholder="you@example.com">
+          </div>
+          <div class="field">
+            <label for="c-phone">Phone</label>
+            <input id="c-phone" type="tel" name="phone" maxlength="20" placeholder="+91 …">
+          </div>
+          <div class="field">
+            <label for="c-subject">Subject</label>
+            <input id="c-subject" type="text" name="subject" maxlength="150" placeholder="What is this about?">
+          </div>
+          <div class="field full">
+            <label for="c-msg">Message <span class="req">*</span></label>
+            <textarea id="c-msg" name="message" required minlength="10" maxlength="2000" placeholder="Tell us how we can help…"></textarea>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-block" type="submit">{{ icon('send') }} Send message</button>
+        <p class="tiny muted" style="margin:.75rem 0 0">Your message is stored in the hostel office inbox — no external email service is used.</p>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= CTA ============================= -->
+<section class="section" style="padding-top:0">
+  <div class="container">
+    <div class="cta-band">
+      <div class="row wrap" style="justify-content:space-between">
+        <div style="max-width:60ch">
+          <span class="eyebrow" style="color:#7dd3fc">Ready when you are</span>
+          <h2>Get your room sorted in minutes</h2>
+          <p>Register with your enrollment number, track your allocation and pay nothing online — fees are recorded at the office and reflected instantly in your portal.</p>
+        </div>
+        <div class="stack-sm" style="min-width:220px">
+          {% if registration_open %}
+          <a class="btn btn-white btn-lg" href="{{ url_for('auth.register') }}">{{ icon('user-plus') }} Create student account</a>
+          {% endif %}
+          <a class="btn btn-lg" style="background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.25)" href="{{ url_for('auth.admin_login') }}">{{ icon('shield-check') }} Administrator login</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= FOOTER ============================= -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <a href="{{ url_for('public.home') }}" class="brand" style="border:0;padding:0;margin:0 0 .8rem">
+          {{ logo() }}
+          <span class="brand-text">
+            <span class="brand-name">{{ hostel_name }}</span>
+            <span class="brand-sub">Hostel Management</span>
+          </span>
+        </a>
+        <p style="font-size:.86rem;max-width:34ch">{{ hostel_address }}</p>
+        <div class="row" style="gap:.4rem;margin-top:.8rem">
+          <span class="badge brand">{{ academic_session }} session</span>
+          {% if stats.free_beds %}<span class="badge ok">{{ stats.free_beds }} beds free</span>{% endif %}
+        </div>
+      </div>
+      <div>
+        <h5>Explore</h5>
+        <a href="#about">About the hostel</a><br>
+        <a href="#facilities">Facilities</a><br>
+        <a href="#rooms">Rooms &amp; fees</a><br>
+        <a href="#rules">Hostel rules</a><br>
+        <a href="#faq">FAQ</a>
+      </div>
+      <div>
+        <h5>Portals</h5>
+        <a href="{{ url_for('auth.login') }}">Student login</a><br>
+        {% if registration_open %}<a href="{{ url_for('auth.register') }}">Student registration</a><br>{% endif %}
+        <a href="{{ url_for('auth.admin_login') }}">Administrator login</a><br>
+        <a href="#contact">Contact office</a>
+      </div>
+      <div>
+        <h5>Reach us</h5>
+        <a href="mailto:{{ hostel_email }}">{{ hostel_email }}</a><br>
+        <a href="tel:{{ hostel_phone|replace(' ', '') }}">{{ hostel_phone }}</a><br>
+        <span style="font-size:.86rem;display:inline-block;padding:.18rem 0">Mon – Sat · 9 AM – 5:30 PM</span>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© {{ now.year }} {{ hostel_name }} · Hostel Management System</span>
+      <span>Built with Flask, SQLite &amp; Chart.js · Academic project</span>
+    </div>
+  </div>
+</footer>
+{% endblock %}

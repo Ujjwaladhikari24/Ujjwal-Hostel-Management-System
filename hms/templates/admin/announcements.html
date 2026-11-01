@@ -1,0 +1,130 @@
+{% extends "dashboard_base.html" %}
+{% from 'partials/macros.html' import icon, badge, empty %}
+{% block title %}Announcements — {{ hostel_name }}{% endblock %}
+{% block page_title %}Announcements{% endblock %}
+{% block page_sub %}{{ rows|length }} notice(s) · published notices appear in every student portal{% endblock %}
+
+{% block page_header %}
+<div class="page-head">
+  <div>
+    <div class="breadcrumb"><a href="{{ url_for('admin.overview') }}">Overview</a> {{ icon('chevron-right') }} <span>Announcements</span></div>
+    <h1>Notice board</h1>
+    <p>Publish hostel notices. Each published notice also creates an in-app notification for every active student.</p>
+  </div>
+  <div class="page-actions"><button class="btn btn-primary" data-modal-open="annModal">{{ icon('plus') }} New announcement</button></div>
+</div>
+{% endblock %}
+
+{% block page_content %}
+<div class="grid-2-1" style="align-items:start">
+  <section class="card" data-anim>
+    <div class="card-head"><h3>{{ icon('megaphone') }} All announcements</h3></div>
+    {% if rows %}
+    <div class="card-body stack">
+      {% for a in rows %}
+      <article class="card card-pad" style="box-shadow:none;border-left:4px solid {{ '#f97316' if a.is_pinned else '#4f46e5' }}">
+        <div class="row-between">
+          <div class="row wrap" style="gap:.4rem">
+            {{ badge(a.tag, 'brand') }}
+            {{ badge('Published', 'ok', true) if a.is_published else badge('Draft', 'muted', true) }}
+            {% if a.is_pinned %}{{ badge('Pinned', 'warn') }}{% endif %}
+          </div>
+          <span class="tiny muted">{{ a.created_at|dt }}</span>
+        </div>
+        <h3 style="font-size:1rem;margin:.55rem 0 .3rem">{{ a.title }}</h3>
+        <div class="soft" style="font-size:.88rem">{{ a.body|nl2br }}</div>
+
+        <form method="post" action="{{ url_for('admin.announcement_edit', ann_id=a.id) }}" style="margin-top:.9rem">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <details>
+            <summary class="tiny" style="cursor:pointer;color:var(--royal);font-weight:650">Edit this announcement</summary>
+            <div class="stack-sm" style="margin-top:.7rem">
+              <div class="field"><label>Title</label><input type="text" name="title" value="{{ a.title }}" maxlength="150" required></div>
+              <div class="field"><label>Message</label><textarea name="body" maxlength="4000" required>{{ a.body }}</textarea></div>
+              <div class="form-grid">
+                <div class="field">
+                  <label>Tag</label>
+                  <select name="tag">{% for t in tags %}<option value="{{ t }}" {{ 'selected' if a.tag == t }}>{{ t }}</option>{% endfor %}</select>
+                </div>
+                <div class="field">
+                  <label>Options</label>
+                  <label class="check"><input type="checkbox" name="is_published" value="1" {{ 'checked' if a.is_published }}> Published</label>
+                  <label class="check"><input type="checkbox" name="is_pinned" value="1" {{ 'checked' if a.is_pinned }}> Pin to top</label>
+                </div>
+              </div>
+              <button class="btn btn-primary btn-sm" type="submit">{{ icon('save', 'i-sm') }} Save changes</button>
+            </div>
+          </details>
+        </form>
+
+        <div class="row" style="gap:.4rem;margin-top:.7rem">
+          <form method="post" action="{{ url_for('admin.announcement_toggle', ann_id=a.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-outline btn-sm" type="submit">{{ icon('eye-off' if a.is_published else 'eye', 'i-sm') }} {{ 'Unpublish' if a.is_published else 'Publish' }}</button>
+          </form>
+          <form method="post" action="{{ url_for('admin.announcement_delete', ann_id=a.id) }}" data-confirm="Delete “{{ a.title }}”?">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-danger-soft btn-sm" type="submit">{{ icon('trash-2', 'i-sm') }} Delete</button>
+          </form>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+      {{ empty('megaphone', 'No announcements yet', 'Publish the first notice for residents using the button above.') }}
+    {% endif %}
+  </section>
+
+  <div class="stack">
+    <section class="card card-pad" data-anim>
+      <h3 style="font-size:.96rem">{{ icon('lightbulb') }} What works well</h3>
+      <ul class="tiny muted" style="padding-left:1.1rem;margin:.4rem 0 0;line-height:1.8">
+        <li>Fee reminders with the exact due date</li>
+        <li>Maintenance windows (water, electricity)</li>
+        <li>Mess menu changes and festival meals</li>
+        <li>Holiday and vacation notices</li>
+        <li>Events, sports and committee meetings</li>
+      </ul>
+    </section>
+    <section class="card card-pad" data-anim>
+      <h3 style="font-size:.96rem">{{ icon('bell-ring') }} How students see it</h3>
+      <p class="tiny muted">Published notices appear on the student dashboard, on the Announcements page and as an in-app notification. No email or SMS is sent — this project does not connect to an external messaging provider.</p>
+    </section>
+  </div>
+</div>
+
+<dialog class="modal" id="annModal">
+  <form method="post" action="{{ url_for('admin.announcements') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="modal-head">
+      <h3>{{ icon('megaphone') }} New announcement</h3>
+      <button class="icon-btn" type="button" data-modal-close>{{ icon('x') }}</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label for="title">Title <span class="req">*</span></label>
+        <input id="title" type="text" name="title" required minlength="5" maxlength="150" placeholder="e.g. Water supply maintenance on 12th">
+      </div>
+      <div class="field">
+        <label for="body">Message <span class="req">*</span></label>
+        <textarea id="body" name="body" required minlength="10" maxlength="4000" placeholder="Details students need to know…"></textarea>
+      </div>
+      <div class="form-grid">
+        <div class="field">
+          <label for="tag">Tag</label>
+          <select id="tag" name="tag">{% for t in tags %}<option value="{{ t }}">{{ t }}</option>{% endfor %}</select>
+        </div>
+        <div class="field">
+          <label>Options</label>
+          <label class="check"><input type="checkbox" name="is_published" value="1" checked> Publish immediately</label>
+          <label class="check"><input type="checkbox" name="is_pinned" value="1"> Pin to top</label>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" type="button" data-modal-close>Cancel</button>
+      <button class="btn btn-primary" type="submit">{{ icon('send', 'i-sm') }} Publish</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}

@@ -1,0 +1,97 @@
+{% extends "dashboard_base.html" %}
+{% from 'partials/macros.html' import icon, avatar, status_badge, badge, empty, pager %}
+{% block title %}Student Management — {{ hostel_name }}{% endblock %}
+{% block page_title %}Student management{% endblock %}
+{% block page_sub %}{{ page.total }} record(s) matching your filters{% endblock %}
+
+{% block page_header %}
+<div class="page-head">
+  <div>
+    <div class="breadcrumb"><a href="{{ url_for('admin.overview') }}">Overview</a> {{ icon('chevron-right') }} <span>Students</span></div>
+    <h1>Students</h1>
+    <p>Add, verify, edit and deactivate resident accounts. Financial history is always preserved.</p>
+  </div>
+  <div class="page-actions">
+    <a class="btn btn-outline" href="{{ url_for('admin.export_csv', kind='students') }}">{{ icon('download') }} Export CSV</a>
+    <a class="btn btn-primary" href="{{ url_for('admin.student_new') }}">{{ icon('user-plus') }} Add student</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_content %}
+<section class="card" data-anim>
+  <div class="card-head">
+    <h3>{{ icon('search') }} Search &amp; filter</h3>
+    <form class="filters" method="get" action="{{ url_for('admin.students') }}" data-autosubmit>
+      <input class="grow" type="search" name="q" value="{{ q }}" placeholder="Name, email, phone, enrollment, course…" aria-label="Search students">
+      <select name="status" aria-label="Status">
+        <option value="">All statuses</option>
+        <option value="Active" {{ 'selected' if status == 'Active' }}>Active</option>
+        <option value="Inactive" {{ 'selected' if status == 'Inactive' }}>Inactive</option>
+      </select>
+      <select name="year" aria-label="Year">
+        <option value="">All years</option>
+        {% for y in years %}<option value="{{ y }}" {{ 'selected' if year == y }}>{{ y }}</option>{% endfor %}
+      </select>
+      <select name="housed" aria-label="Allocation">
+        <option value="">Any allocation</option>
+        <option value="yes" {{ 'selected' if housed == 'yes' }}>Allocated</option>
+        <option value="no" {{ 'selected' if housed == 'no' }}>Unallocated</option>
+      </select>
+      <button class="btn btn-outline btn-sm" type="submit">{{ icon('filter', 'i-sm') }} Apply</button>
+      {% if q or status or year or housed %}<a class="btn btn-ghost btn-sm" href="{{ url_for('admin.students') }}">Reset</a>{% endif %}
+    </form>
+  </div>
+
+  {% if rows %}
+  <div class="table-wrap">
+    <table class="data">
+      <thead>
+        <tr>
+          <th>Student</th><th>Enrollment</th><th>Course / year</th><th>Room</th>
+          <th class="num">Balance</th><th>Status</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in rows %}
+        <tr>
+          <td>
+            <div class="row">
+              {{ avatar(s.user, 'sm') }}
+              <div>
+                <div class="t-title">{{ s.user.name }}</div>
+                <div class="t-sub t-clip" title="{{ s.user.email }}{% if s.user.phone %} · {{ s.user.phone }}{% endif %}">{{ s.user.email }}{% if s.user.phone %} · {{ s.user.phone }}{% endif %}</div>
+              </div>
+            </div>
+          </td>
+          <td class="mono tiny">{{ s.enrollment_no }}</td>
+          <td>{{ s.course or '—' }}<div class="t-sub">{{ s.year or '—' }}</div></td>
+          <td class="nowrap-cell">
+            {% if s.room %}{{ badge(s.room.room_number, 'info') }} <span class="tiny muted">bed {{ s.active_allocation.bed_number }}</span>
+            {% else %}{{ badge('Unallocated', 'muted') }}{% endif %}
+          </td>
+          <td class="num" style="font-weight:700;color:{{ '#dc2626' if s.balance > 0 else '#047857' }}">₹{{ '{:,.0f}'.format(s.balance) }}</td>
+          <td>{{ status_badge(s.status) }}</td>
+          <td>
+            <div class="table-actions">
+              <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.student_detail', student_id=s.id) }}" title="View profile">{{ icon('eye', 'i-sm') }}</a>
+              <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.student_edit', student_id=s.id) }}" title="Edit">{{ icon('pencil', 'i-sm') }}</a>
+              <form method="post" action="{{ url_for('admin.student_toggle', student_id=s.id) }}" data-confirm="Change account status for {{ s.user.name }}?">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-ghost btn-sm" type="submit" title="{{ 'Deactivate' if s.status == 'Active' else 'Activate' }}">
+                  {{ icon('power', 'i-sm') }}
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {{ pager(page) }}
+  {% else %}
+    {{ empty('users', 'No students found', 'Try a different search, or add the first student to get started.', url_for('admin.student_new'), 'Add student') }}
+  {% endif %}
+</section>
+{% endblock %}

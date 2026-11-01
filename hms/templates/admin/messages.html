@@ -1,0 +1,90 @@
+{% extends "dashboard_base.html" %}
+{% from 'partials/macros.html' import icon, badge, empty %}
+{% block title %}Messages — {{ hostel_name }}{% endblock %}
+{% block page_title %}Office inbox{% endblock %}
+{% block page_sub %}Public enquiries and student messages{% endblock %}
+
+{% block page_header %}
+<div class="page-head">
+  <div>
+    <div class="breadcrumb"><a href="{{ url_for('admin.overview') }}">Overview</a> {{ icon('chevron-right') }} <span>Messages</span></div>
+    <h1>Messages</h1>
+    <p>Contact-form enquiries from the public website and messages sent by residents.</p>
+  </div>
+  <div class="page-actions"><a class="btn btn-outline" href="{{ url_for('admin.complaints') }}">{{ icon('message-square-warning') }} Complaints</a></div>
+</div>
+{% endblock %}
+
+{% block page_content %}
+<div data-tab-group>
+  <div class="tabs">
+    <button class="tab active" data-tab="public">{{ icon('globe', 'i-sm') }} Website enquiries ({{ rows|length }})</button>
+    <button class="tab" data-tab="students">{{ icon('users-round', 'i-sm') }} Student messages ({{ student_rows|length }})</button>
+  </div>
+
+  <div data-tab-panel="public">
+    <section class="card">
+      {% if rows %}
+      <div class="card-body stack">
+        {% for m in rows %}
+        <article class="card card-pad" style="box-shadow:none;border-color:{{ '#c7d2fe' if not m.is_read else 'var(--line)' }}">
+          <div class="row-between">
+            <div class="row" style="gap:.6rem">
+              <strong>{{ m.name }}</strong>
+              {% if not m.is_read %}{{ badge('New', 'warn') }}{% endif %}
+              {{ badge(m.subject, 'brand') }}
+            </div>
+            <div class="row" style="gap:.5rem">
+              <span class="tiny muted">{{ m.created_at|dt }}</span>
+              <form method="post" action="{{ url_for('admin.message_read', msg_id=m.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-ghost btn-sm" type="submit">{{ icon('mail-open', 'i-sm') }} Mark {{ 'unread' if m.is_read else 'read' }}</button>
+              </form>
+            </div>
+          </div>
+          <div class="tiny muted" style="margin:.35rem 0 .5rem">
+            {{ icon('mail', 'i-sm') }} <a href="mailto:{{ m.email }}">{{ m.email }}</a>
+            {% if m.phone %} · {{ icon('phone', 'i-sm') }} <a href="tel:{{ m.phone }}">{{ m.phone }}</a>{% endif %}
+          </div>
+          <p style="font-size:.88rem;margin:0">{{ m.message|nl2br }}</p>
+        </article>
+        {% endfor %}
+      </div>
+      {% else %}
+        {{ empty('inbox', 'No website enquiries', 'Messages submitted through the public contact form land here.') }}
+      {% endif %}
+    </section>
+  </div>
+
+  <div data-tab-panel="students" class="hidden">
+    <section class="card">
+      {% if student_rows %}
+      <div class="card-body stack">
+        {% for m in student_rows %}
+        <article class="card card-pad" style="box-shadow:none;border-color:{{ '#c7d2fe' if not m.is_read else 'var(--line)' }}">
+          <div class="row-between">
+            <div class="row" style="gap:.6rem">
+              <strong>{{ m.name }}</strong>
+              {% if not m.is_read %}{{ badge('New', 'warn') }}{% endif %}
+              {{ badge(m.subject, 'brand') }}
+            </div>
+            <div class="row" style="gap:.5rem">
+              <span class="tiny muted">{{ m.created_at|dt }}</span>
+              <form method="post" action="{{ url_for('admin.message_read', msg_id=m.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-ghost btn-sm" type="submit">{{ icon('mail-open', 'i-sm') }} Mark {{ 'unread' if m.is_read else 'read' }}</button>
+              </form>
+            </div>
+          </div>
+          <div class="tiny muted" style="margin:.35rem 0 .5rem">{{ icon('mail', 'i-sm') }} <a href="mailto:{{ m.email }}">{{ m.email }}</a></div>
+          <p style="font-size:.88rem;margin:0">{{ m.message|nl2br }}</p>
+        </article>
+        {% endfor %}
+      </div>
+      {% else %}
+        {{ empty('mail', 'No student messages', 'Residents can message the office from their portal.') }}
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

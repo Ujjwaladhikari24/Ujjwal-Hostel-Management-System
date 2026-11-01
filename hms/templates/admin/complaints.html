@@ -1,0 +1,112 @@
+{% extends "dashboard_base.html" %}
+{% from 'partials/macros.html' import icon, status_badge, badge, empty, pager %}
+{% block title %}Complaint Management — {{ hostel_name }}{% endblock %}
+{% block page_title %}Complaint management{% endblock %}
+{% block page_sub %}{{ stats['Pending'] }} pending · {{ stats['In Progress'] }} in progress{% endblock %}
+
+{% block page_header %}
+<div class="page-head">
+  <div>
+    <div class="breadcrumb"><a href="{{ url_for('admin.overview') }}">Overview</a> {{ icon('chevron-right') }} <span>Complaints</span></div>
+    <h1>Complaints</h1>
+    <p>Respond, update status and keep resolution times under control.</p>
+  </div>
+  <div class="page-actions">
+    <a class="btn btn-outline" href="{{ url_for('admin.export_csv', kind='complaints') }}">{{ icon('download') }} Export CSV</a>
+    <a class="btn btn-outline" href="{{ url_for('admin.messages') }}">{{ icon('inbox') }} Messages {% if unread_messages %}{{ badge(unread_messages ~ ' new', 'warn') }}{% endif %}</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_content %}
+<div class="kpi-grid">
+  <div class="kpi kpi-orange"><div class="kpi-icon">{{ icon('clock', 'i-lg') }}</div><div class="kpi-label">Pending</div><div class="kpi-value">{{ stats['Pending'] }}</div><div class="kpi-sub">awaiting first action</div></div>
+  <div class="kpi kpi-teal"><div class="kpi-icon">{{ icon('loader', 'i-lg') }}</div><div class="kpi-label">In progress</div><div class="kpi-value">{{ stats['In Progress'] }}</div><div class="kpi-sub">being worked on</div></div>
+  <div class="kpi kpi-green"><div class="kpi-icon">{{ icon('check-circle-2', 'i-lg') }}</div><div class="kpi-label">Resolved</div><div class="kpi-value">{{ stats['Resolved'] }}</div><div class="kpi-sub">closed successfully</div></div>
+  <div class="kpi kpi-sunset"><div class="kpi-icon">{{ icon('x-circle', 'i-lg') }}</div><div class="kpi-label">Rejected</div><div class="kpi-value">{{ stats['Rejected'] }}</div><div class="kpi-sub">not actionable</div></div>
+</div>
+
+<div class="grid-2-1" style="align-items:start">
+  <section class="card" data-anim>
+    <div class="card-head">
+      <h3>{{ icon('list-filter') }} Tickets</h3>
+      <form class="filters" method="get" action="{{ url_for('admin.complaints') }}" data-autosubmit>
+        <input class="grow" type="search" name="q" value="{{ q }}" placeholder="Ticket, subject, student…" aria-label="Search complaints">
+        <select name="status" aria-label="Status">
+          <option value="">All statuses</option>
+          {% for s in statuses %}<option value="{{ s }}" {{ 'selected' if status == s }}>{{ s }}</option>{% endfor %}
+        </select>
+        <select name="category" aria-label="Category">
+          <option value="">All categories</option>
+          {% for c in categories %}<option value="{{ c }}" {{ 'selected' if category == c }}>{{ c }}</option>{% endfor %}
+        </select>
+        <button class="btn btn-outline btn-sm" type="submit">{{ icon('filter', 'i-sm') }}</button>
+        {% if q or status or category %}<a class="btn btn-ghost btn-sm" href="{{ url_for('admin.complaints') }}">Reset</a>{% endif %}
+      </form>
+    </div>
+
+    {% if rows %}
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th>Ticket</th><th>Student</th><th>Subject</th><th>Raised</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+          {% for c in rows %}
+          <tr>
+            <td class="mono tiny">{{ c.ticket_no }}</td>
+            <td class="t-title">{{ c.student.user.name }}<div class="t-sub">{{ c.student.enrollment_no }}{% if c.student.room %} · {{ c.student.room.room_number }}{% endif %}</div></td>
+            <td>{{ c.subject|truncate(42) }}
+              <div class="t-sub">{{ badge(c.category, 'brand') }} {% if c.priority == 'High' %}{{ badge('High priority', 'danger') }}{% endif %}</div>
+            </td>
+            <td class="tiny">{{ c.created_at|ago }}</td>
+            <td>{{ status_badge(c.status) }}</td>
+            <td class="right"><a class="btn btn-primary btn-sm" href="{{ url_for('admin.complaint_detail', complaint_id=c.id) }}">Handle</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {{ pager(page) }}
+    {% else %}
+      {{ empty('inbox', 'No complaints match', 'Adjust the filters or wait for students to raise issues.') }}
+    {% endif %}
+  </section>
+
+  <div class="stack">
+    <section class="card" data-anim>
+      <div class="card-head"><h3>{{ icon('bar-chart-3') }} Complaints by category</h3></div>
+      <div class="card-body">
+        {% if cat_labels %}
+          <div class="chart-box h-260"><canvas id="catChart"></canvas></div>
+        {% else %}
+          <p class="tiny muted">No complaint data yet.</p>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="card card-pad" data-anim>
+      <h3 style="font-size:.96rem">{{ icon('gauge') }} Resolution quality</h3>
+      <div class="info-list">
+        <div class="info-row"><span class="k">Total tickets</span><span class="v">{{ stats.values()|sum }}</span></div>
+        <div class="info-row"><span class="k">Resolution rate</span><span class="v">{{ (stats['Resolved'] * 100 / (stats.values()|sum))|round|int if stats.values()|sum else 0 }}%</span></div>
+        <div class="info-row"><span class="k">Open workload</span><span class="v">{{ stats['Pending'] + stats['In Progress'] }}</span></div>
+      </div>
+      <a class="btn btn-outline btn-block btn-sm" style="margin-top:.8rem" href="{{ url_for('admin.quality') }}">{{ icon('gauge', 'i-sm') }} Open quality dashboard</a>
+    </section>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if cat_labels %}
+<script>
+  HMS_CHART('catChart', {
+    type: 'bar',
+    data: {
+      labels: {{ cat_labels|tojson }},
+      datasets: [{ label: 'Complaints', data: {{ cat_values|tojson }}, backgroundColor: '#7c3aed', borderRadius: 8 }]
+    },
+    options: { indexAxis: 'y', scales: { x: { beginAtZero: true, grid: {}, ticks: { precision: 0 } }, y: { grid: { display: false }, ticks: {} } }, plugins: { legend: { display: false } } }
+  });
+</script>
+{% endif %}
+{% endblock %}

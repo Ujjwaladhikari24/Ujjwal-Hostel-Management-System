@@ -1,0 +1,239 @@
+{% extends "dashboard_base.html" %}
+{% from 'partials/macros.html' import icon, status_badge, badge, empty, avatar %}
+{% block title %}Fee Management — {{ hostel_name }}{% endblock %}
+{% block page_title %}Fee management{% endblock %}
+{% block page_sub %}₹{{ '{:,.0f}'.format(totals.billed) }} billed · ₹{{ '{:,.0f}'.format(totals.due) }} outstanding{% endblock %}
+
+{% block page_header %}
+<div class="page-head">
+  <div>
+    <div class="breadcrumb"><a href="{{ url_for('admin.overview') }}">Overview</a> {{ icon('chevron-right') }} <span>Fees</span></div>
+    <h1>Hostel fees</h1>
+    <p>Assign fee heads, track dues and record payments received at the office.</p>
+  </div>
+  <div class="page-actions">
+    <a class="btn btn-outline" href="{{ url_for('admin.export_csv', kind='dues') }}">{{ icon('download') }} Pending dues CSV</a>
+    <button class="btn btn-primary" data-modal-open="feeModal">{{ icon('plus') }} Assign fee</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_content %}
+<div class="stat-strip" data-anim>
+  <div class="stat-mini"><div class="l">Billed (filtered)</div><div class="v">₹{{ '{:,.0f}'.format(totals.billed) }}</div></div>
+  <div class="stat-mini"><div class="l">Collected</div><div class="v" style="color:#047857">₹{{ '{:,.0f}'.format(totals.paid) }}</div></div>
+  <div class="stat-mini"><div class="l">Outstanding</div><div class="v" style="color:#dc2626">₹{{ '{:,.0f}'.format(totals.due) }}</div></div>
+  <div class="stat-mini"><div class="l">Overdue invoices</div><div class="v">{{ totals.overdue }}</div></div>
+  <div class="stat-mini"><div class="l">Fee records</div><div class="v">{{ rows|length }}</div></div>
+</div>
+
+<section class="card" data-anim>
+  <div class="card-head">
+    <h3>{{ icon('receipt-indian-rupee') }} Fee records</h3>
+    <form class="filters" method="get" action="{{ url_for('admin.fees') }}" data-autosubmit>
+      <input class="grow" type="search" name="q" value="{{ q }}" placeholder="Student, enrollment or fee head…" aria-label="Search fees">
+      <select name="status" aria-label="Status">
+        <option value="">All statuses</option>
+        {% for s in ['Pending', 'Partial', 'Paid', 'Overdue'] %}
+          <option value="{{ s }}" {{ 'selected' if status == s }}>{{ s }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-outline btn-sm" type="submit">{{ icon('filter', 'i-sm') }} Apply</button>
+      {% if q or status %}<a class="btn btn-ghost btn-sm" href="{{ url_for('admin.fees') }}">Reset</a>{% endif %}
+    </form>
+  </div>
+
+  {% if rows %}
+  <div class="table-wrap">
+    <table class="data">
+      <thead>
+        <tr><th>Student</th><th>Fee head</th><th>Due date</th><th class="num">Amount</th>
+            <th class="num">Paid</th><th class="num">Balance</th><th>Status</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for f in rows %}
+        <tr>
+          <td>
+            <div class="row">
+              {{ avatar(f.student.user, 'sm') }}
+              <div>
+                <div class="t-title">{{ f.student.user.name }}</div>
+                <div class="t-sub">{{ f.student.enrollment_no }}{% if f.student.room %} · Room {{ f.student.room.room_number }}{% endif %}</div>
+              </div>
+            </div>
+          </td>
+          <td>{{ f.title }}<div class="t-sub">{{ f.semester or '' }}</div></td>
+          <td class="tiny">{{ f.due_date|date }}</td>
+          <td class="num">₹{{ '{:,.0f}'.format(f.amount) }}</td>
+          <td class="num">₹{{ '{:,.0f}'.format(f.paid_amount) }}</td>
+          <td class="num" style="font-weight:700;color:{{ '#dc2626' if f.balance > 0 else '#047857' }}">₹{{ '{:,.0f}'.format(f.balance) }}</td>
+          <td>{{ status_badge(f.status) }}</td>
+          <td>
+            <div class="table-actions">
+              {% if f.balance > 0 %}
+              <button class="btn btn-teal btn-sm" data-modal-open="payModal"
+                      data-field-student_id="{{ f.student_id }}"
+                      data-field-fee_record_id="{{ f.id }}"
+                      data-field-amount="{{ f.balance }}"
+                      data-label-student="{{ f.student.user.name }} · {{ f.title }}">{{ icon('wallet', 'i-sm') }} Pay</button>
+              {% else %}{{ badge('Settled', 'ok') }}{% endif %}
+              {% if not f.payments %}
+              <form method="post" action="{{ url_for('admin.fee_delete', fee_id=f.id) }}" data-confirm="Delete fee “{{ f.title }}” for {{ f.student.user.name }}?">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-ghost btn-sm" type="submit" title="Delete">{{ icon('trash-2', 'i-sm') }}</button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    {{ empty('receipt', 'No fee records', 'Assign a fee to a single student, a room, a year group or all active students.') }}
+    <div class="card-body center"><button class="btn btn-primary" data-modal-open="feeModal">{{ icon('plus') }} Assign a fee</button></div>
+  {% endif %}
+</section>
+
+<!-- assign fee -->
+<dialog class="modal" id="feeModal">
+  <form method="post" action="{{ url_for('admin.fee_new') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="modal-head">
+      <h3>{{ icon('receipt-indian-rupee') }} Assign a fee</h3>
+      <button class="icon-btn" type="button" data-modal-close>{{ icon('x') }}</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="field full">
+          <label for="title">Fee head <span class="req">*</span></label>
+          <input id="title" type="text" name="title" value="Hostel Fee" required maxlength="120" placeholder="e.g. Semester Hostel Fee">
+        </div>
+        <div class="field">
+          <label for="amount">Amount (₹) <span class="req">*</span></label>
+          <input id="amount" type="number" name="amount" min="1" step="1" required value="{{ default_fee or '' }}">
+        </div>
+        <div class="field">
+          <label for="due_date">Due date <span class="req">*</span></label>
+          <input id="due_date" type="date" name="due_date" required value="{{ today.isoformat() }}">
+        </div>
+        <div class="field">
+          <label for="semester">Semester / session</label>
+          <input id="semester" type="text" name="semester" value="{{ session_name or '' }}" maxlength="40">
+        </div>
+        <div class="field">
+          <label for="target">Apply to</label>
+          <select id="target" name="target">
+            <option value="single">One student</option>
+            <option value="room">All residents of a room</option>
+            <option value="year">A year group</option>
+            <option value="all">All active students</option>
+          </select>
+        </div>
+        <div class="field full" id="targetStudentWrap">
+          <label for="student_id">Student</label>
+          <select id="targetStudent" name="student_id">
+            <option value="">Select student…</option>
+            {% for s in students %}<option value="{{ s.id }}">{{ s.user.name }} · {{ s.enrollment_no }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="field full hidden" id="targetRoomWrap">
+          <label for="targetRoom">Room</label>
+          <select id="targetRoom" name="room_id">
+            <option value="">Select room…</option>
+            {% for r in rooms %}<option value="{{ r.id }}">Room {{ r.room_number }} · {{ r.room_type }} · {{ r.occupied_beds }} resident(s)</option>{% endfor %}
+          </select>
+        </div>
+        <div class="field full hidden" id="targetYearWrap">
+          <label for="targetYear">Year group</label>
+          <select id="targetYear" name="year">
+            {% for y in ['1st Year', '2nd Year', '3rd Year', '4th Year', '5th Year', 'Postgraduate', 'Other'] %}
+              <option value="{{ y }}">{{ y }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field full">
+          <label for="description">Description</label>
+          <input id="description" type="text" name="description" maxlength="255" placeholder="Optional note shown to the student">
+        </div>
+      </div>
+      <div class="alert warning" style="margin-bottom:0">
+        {{ icon('alert-triangle') }}
+        <div>Bulk assignment creates one fee record per student. This action cannot be undone in bulk, so check the target carefully.</div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" type="button" data-modal-close>Cancel</button>
+      <button class="btn btn-primary" type="submit">{{ icon('save', 'i-sm') }} Assign fee</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- record payment -->
+<dialog class="modal" id="payModal">
+  <form method="post" action="{{ url_for('admin.payment_new') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="modal-head">
+      <h3>{{ icon('wallet') }} Record payment</h3>
+      <button class="icon-btn" type="button" data-modal-close>{{ icon('x') }}</button>
+    </div>
+    <div class="modal-body">
+      <p class="tiny muted">Recording <strong data-label="student">a payment</strong>.</p>
+      <div class="form-grid">
+        <div class="field full">
+          <label for="pay_student">Student <span class="req">*</span></label>
+          <select id="pay_student" name="student_id" required>
+            <option value="">Select student…</option>
+            {% for s in students %}<option value="{{ s.id }}">{{ s.user.name }} · {{ s.enrollment_no }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="pay_fee">Against fee record</label>
+          <select id="pay_fee" name="fee_record_id">
+            <option value="">General payment</option>
+            {% for f in rows if f.balance > 0 %}
+              <option value="{{ f.id }}">{{ f.student.user.name }} · {{ f.title }} · ₹{{ '{:,.0f}'.format(f.balance) }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="pay_amount">Amount (₹) <span class="req">*</span></label>
+          <input id="pay_amount" type="number" name="amount" min="1" step="0.01" required>
+        </div>
+        <div class="field">
+          <label for="pay_method">Method</label>
+          <select id="pay_method" name="method">
+            {% for m in ['Cash', 'UPI', 'Bank Transfer', 'Other'] %}<option value="{{ m }}">{{ m }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="paid_on">Date</label>
+          <input id="paid_on" type="date" name="paid_on" value="{{ today.isoformat() }}" required>
+        </div>
+        <div class="field full">
+          <label for="reference">Reference</label>
+          <input id="reference" type="text" name="reference" maxlength="80" placeholder="UPI / cheque / receipt book no.">
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" type="button" data-modal-close>Cancel</button>
+      <button class="btn btn-teal" type="submit">{{ icon('badge-check', 'i-sm') }} Record payment</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // show the right target field inside the "assign fee" modal
+  document.addEventListener('change', function (e) {
+    if (e.target.id !== 'target') return;
+    var v = e.target.value;
+    document.getElementById('targetStudentWrap').classList.toggle('hidden', v !== 'single');
+    document.getElementById('targetYearWrap').classList.toggle('hidden', v !== 'year');
+    document.getElementById('targetRoomWrap').classList.toggle('hidden', v !== 'room');
+  });
+</script>
+{% endblock %}

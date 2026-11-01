@@ -1,0 +1,87 @@
+{# ---------------------------------------------------------------
+   Reusable UI macros
+   --------------------------------------------------------------- #}
+
+{% macro icon(name, cls='i') -%}
+<i data-lucide="{{ name }}" class="{{ cls }}"></i>
+{%- endmacro %}
+
+{% macro logo(cls='logo') -%}
+{% include 'partials/logo.html' %}
+{%- endmacro %}
+
+{% macro badge(text, cls='muted', dot=false) -%}
+<span class="badge {{ cls }}{% if dot %} dot{% endif %}">{{ text }}</span>
+{%- endmacro %}
+
+{% macro status_badge(status) -%}
+{% set map = {
+  'Paid':'ok','Resolved':'ok','Active':'ok','Available':'ok','Closed':'ok',
+  'Partial':'warn','Pending':'warn','Partially Occupied':'warn','On Leave':'warn',
+  'Overdue':'danger','Rejected':'danger','Maintenance':'danger','Inactive':'danger',
+  'Full':'info','In Progress':'info','Open':'info','Archived':'muted','Unallocated':'muted'
+} %}
+{{ badge(status, map.get(status, 'muted'), true) }}
+{%- endmacro %}
+
+{% macro avatar(person, size='') -%}
+{%- set photo = person.photo if person.photo is defined and person.photo else (person.user.photo if person.user is defined and person.user else none) -%}
+{%- set name = person.name if person.name is defined and person.name else (person.user.name if person.user is defined else 'User') -%}
+<span class="avatar {{ size }}">
+  {%- if photo -%}<img src="{{ url_for('static', filename=photo) }}" alt="{{ name }}">
+  {%- else -%}{{ name.split(' ')[0][:1] }}{{ name.split(' ')[1][:1] if name.split(' ')|length > 1 else '' }}
+  {%- endif -%}
+</span>
+{%- endmacro %}
+
+{% macro kpi(tone, icon_name, label, value, sub='') -%}
+<div class="kpi kpi-{{ tone }}" data-anim>
+  <div class="kpi-icon">{{ icon(icon_name, 'i-lg') }}</div>
+  <div class="kpi-label">{{ label }}</div>
+  <div class="kpi-value">{{ value }}</div>
+  {% if sub %}<div class="kpi-sub">{{ sub|safe }}</div>{% endif %}
+</div>
+{%- endmacro %}
+
+{% macro empty(icon_name, title, text, action_url='', action_label='') -%}
+<div class="empty">
+  <div class="empty-icon">{{ icon(icon_name, 'i-xl') }}</div>
+  <h4>{{ title }}</h4>
+  <p>{{ text }}</p>
+  {% if action_url %}<a class="btn btn-primary btn-sm" href="{{ action_url }}">{{ icon('plus') }} {{ action_label }}</a>{% endif %}
+</div>
+{%- endmacro %}
+
+{% macro pager(page) -%}
+{% if page.pages > 1 %}
+<div class="pager">
+  <span>Page {{ page.page }} of {{ page.pages }} &middot; {{ page.total }} records</span>
+  <div class="pages">
+    {% set args = dict(request.args) %}
+    {% if page.page > 1 %}
+      <a href="{{ url_for(request.endpoint, **dict(args, page=page.page-1)) }}" title="Previous page">{{ icon('chevron-left', 'i-sm') }}</a>
+    {% endif %}
+    {% for p in range(1, page.pages + 1) %}
+      {% if p <= 2 or p > page.pages - 2 or (p >= page.page - 1 and p <= page.page + 1) %}
+        {% if p == page.page %}<span class="cur">{{ p }}</span>
+        {% else %}<a href="{{ url_for(request.endpoint, **dict(args, page=p)) }}">{{ p }}</a>{% endif %}
+      {% elif p == 3 or p == page.pages - 2 %}
+        <span>…</span>
+      {% endif %}
+    {% endfor %}
+    {% if page.page < page.pages %}
+      <a href="{{ url_for(request.endpoint, **dict(args, page=page.page+1)) }}" title="Next page">{{ icon('chevron-right', 'i-sm') }}</a>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+{%- endmacro %}
+
+{% macro csrf() -%}
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+{%- endmacro %}
+
+{% macro progress(value, tone='') -%}
+{% set v = value|float %}
+<div class="progress {{ tone }}"><span style="width: {{ 100 if v > 100 else (0 if v < 0 else v) }}%"></span></div>
+{%- endmacro %}

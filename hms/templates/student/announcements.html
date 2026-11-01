@@ -1,0 +1,47 @@
+{% extends "dashboard_base.html" %}
+{% from 'partials/macros.html' import icon, badge, empty %}
+{% block title %}Announcements — {{ hostel_name }}{% endblock %}
+{% block page_title %}Announcements{% endblock %}
+{% block page_sub %}Notices published by the hostel office{% endblock %}
+
+{% block page_header %}
+<div class="page-head">
+  <div>
+    <div class="breadcrumb"><a href="{{ url_for('student.dashboard') }}">Dashboard</a> {{ icon('chevron-right') }} <span>Announcements</span></div>
+    <h1>Notice board</h1>
+    <p>{{ rows|length }} published notice(s) for {{ academic_session }}.</p>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_content %}
+<div class="row wrap" style="gap:.4rem">
+  <a class="chip {{ 'active' if not tag }}" href="{{ url_for('student.announcements') }}">All</a>
+  {% for t in tags %}
+    <a class="chip {{ 'active' if tag == t }}" href="{{ url_for('student.announcements', tag=t) }}">{{ t }}</a>
+  {% endfor %}
+</div>
+
+{% if rows %}
+<div class="stack">
+  {% for a in rows %}
+  <article class="card card-pad announce-card" data-anim style="border-left-color: {{ '#f97316' if a.is_pinned else '#4f46e5' }}">
+    <div class="row-between">
+      <div class="row wrap" style="gap:.45rem">
+        {{ badge(a.tag, 'brand') }}
+        {% if a.is_pinned %}{{ badge('Pinned', 'warn') }}{% endif %}
+      </div>
+      <span class="tiny muted">{{ icon('calendar', 'i-sm') }} {{ a.created_at|dt }}</span>
+    </div>
+    <h3 style="margin:.6rem 0 .35rem;font-size:1.05rem">{{ a.title }}</h3>
+    <div class="soft" style="font-size:.9rem">{{ a.body|nl2br }}</div>
+    <div class="tiny muted" style="margin-top:.7rem">Posted by {{ a.author.name if a.author else 'Hostel office' }}</div>
+  </article>
+  {% endfor %}
+</div>
+{% else %}
+<section class="card" data-anim>
+  {{ empty('megaphone', 'No announcements yet', 'Hostel notices, mess schedules and maintenance alerts will appear here as soon as the office publishes them.') }}
+</section>
+{% endif %}
+{% endblock %}

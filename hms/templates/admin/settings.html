@@ -1,0 +1,155 @@
+{% extends "dashboard_base.html" %}
+{% from 'partials/macros.html' import icon, badge, avatar %}
+{% block title %}Settings — {{ hostel_name }}{% endblock %}
+{% block page_title %}Settings{% endblock %}
+{% block page_sub %}Hostel profile, defaults and admin accounts{% endblock %}
+
+{% block page_header %}
+<div class="page-head">
+  <div>
+    <div class="breadcrumb"><a href="{{ url_for('admin.overview') }}">Overview</a> {{ icon('chevron-right') }} <span>Settings</span></div>
+    <h1>System settings</h1>
+    <p>These values are used across the public site, receipts and student portals.</p>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_content %}
+<div class="grid-2-1" style="align-items:start">
+  <div class="stack">
+    <section class="card" data-anim>
+      <div class="card-head"><h3>{{ icon('building-2') }} Hostel profile</h3></div>
+      <form class="card-body" method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="form_kind" value="general">
+        <div class="form-grid">
+          <div class="field">
+            <label for="hostel_name">Hostel name</label>
+            <input id="hostel_name" type="text" name="hostel_name" value="{{ values.hostel_name }}" maxlength="80">
+          </div>
+          <div class="field">
+            <label for="academic_session">Academic session</label>
+            <input id="academic_session" type="text" name="academic_session" value="{{ values.academic_session }}" maxlength="40">
+          </div>
+          <div class="field full">
+            <label for="hostel_tagline">Tagline</label>
+            <input id="hostel_tagline" type="text" name="hostel_tagline" value="{{ values.hostel_tagline }}" maxlength="160">
+          </div>
+          <div class="field full">
+            <label for="address">Address</label>
+            <input id="address" type="text" name="address" value="{{ values.address }}" maxlength="255">
+          </div>
+          <div class="field">
+            <label for="contact_email">Contact email</label>
+            <input id="contact_email" type="email" name="contact_email" value="{{ values.contact_email }}" maxlength="190">
+          </div>
+          <div class="field">
+            <label for="contact_phone">Contact phone</label>
+            <input id="contact_phone" type="tel" name="contact_phone" value="{{ values.contact_phone }}" maxlength="20">
+          </div>
+          <div class="field">
+            <label for="office_hours">Office hours</label>
+            <input id="office_hours" type="text" name="office_hours" value="{{ values.office_hours }}" maxlength="80">
+          </div>
+          <div class="field">
+            <label for="default_fee">Default semester fee (₹)</label>
+            <input id="default_fee" type="number" name="default_fee" value="{{ values.default_fee }}" min="0" step="1">
+          </div>
+          <div class="field full">
+            <label for="late_fee_note">Late fee note</label>
+            <input id="late_fee_note" type="text" name="late_fee_note" value="{{ values.late_fee_note }}" maxlength="160">
+          </div>
+          <div class="field full">
+            <label class="check"><input type="checkbox" name="registration_open" value="1" {{ 'checked' if registration_open }}> Allow new student self-registration</label>
+          </div>
+        </div>
+        <button class="btn btn-primary" type="submit">{{ icon('save') }} Save settings</button>
+      </form>
+    </section>
+
+    <section class="card" data-anim>
+      <div class="card-head"><h3>{{ icon('shield-check') }} Administrator accounts</h3><span class="badge brand">{{ admins|length }}</span></div>
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr><th>Name</th><th>Email</th><th>Last sign-in</th><th>Status</th></tr></thead>
+          <tbody>
+            {% for a in admins %}
+            <tr>
+              <td>
+                <div class="row">
+                  {{ avatar(a, 'sm') }}
+                  <div class="t-title">{{ a.name }}{% if a.id == current_user.id %} <span class="badge info">you</span>{% endif %}</div>
+                </div>
+              </td>
+              <td class="tiny">{{ a.email }}</td>
+              <td class="tiny">{{ a.last_login_at|dt if a.last_login_at else '—' }}</td>
+              <td>{{ badge('Active' if a.is_active else 'Disabled', 'ok' if a.is_active else 'danger', true) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="card-foot">
+        <button class="btn btn-outline btn-sm" data-modal-open="adminModal">{{ icon('user-plus', 'i-sm') }} Add administrator</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="card" data-anim>
+      <div class="card-head"><h3>{{ icon('key-round') }} My password</h3></div>
+      <form class="card-body" method="post" data-validate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="form_kind" value="password">
+        <div class="field">
+          <label for="current_password">Current password</label>
+          <input id="current_password" type="password" name="current_password" required autocomplete="current-password">
+        </div>
+        <div class="field">
+          <label for="new_password">New password</label>
+          <input id="new_password" type="password" name="new_password" required minlength="8" autocomplete="new-password">
+        </div>
+        <div class="field">
+          <label for="confirm_password">Confirm new password</label>
+          <input id="confirm_password" type="password" name="confirm_password" required minlength="8" autocomplete="new-password">
+        </div>
+        <button class="btn btn-dark btn-block" type="submit">{{ icon('shield-check') }} Update password</button>
+      </form>
+    </section>
+
+    <section class="card card-pad" data-anim>
+      <h3 style="font-size:.96rem">{{ icon('database') }} System information</h3>
+      <div class="info-list">
+        <div class="info-row"><span class="k">Database</span><span class="v mono tiny" style="max-width:60%;word-break:break-all">{{ db_uri }}</span></div>
+        <div class="info-row"><span class="k">Registration</span><span class="v">{{ 'Open' if registration_open else 'Closed' }}</span></div>
+        <div class="info-row"><span class="k">Session</span><span class="v">{{ values.academic_session }}</span></div>
+        <div class="info-row"><span class="k">Signed in as</span><span class="v">{{ current_user.name }}</span></div>
+      </div>
+      <div class="alert info" style="margin:1rem 0 0">
+        {{ icon('info') }}
+        <div>Secrets and the database path are configured through environment variables — see <code>.env.example</code>.</div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<dialog class="modal" id="adminModal">
+  <form method="post" action="{{ url_for('admin.settings_add_admin') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="modal-head">
+      <h3>{{ icon('user-plus') }} Add administrator</h3>
+      <button class="icon-btn" type="button" data-modal-close>{{ icon('x') }}</button>
+    </div>
+    <div class="modal-body">
+      <div class="field"><label for="a_name">Full name</label><input id="a_name" type="text" name="name" required minlength="3" maxlength="120"></div>
+      <div class="field"><label for="a_email">Email</label><input id="a_email" type="email" name="email" required maxlength="190"></div>
+      <div class="field"><label for="a_password">Password</label><input id="a_password" type="password" name="password" required minlength="8" autocomplete="new-password"></div>
+      <p class="tiny muted" style="margin:0">Administrators can access every module, so share these credentials privately.</p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" type="button" data-modal-close>Cancel</button>
+      <button class="btn btn-primary" type="submit">{{ icon('save', 'i-sm') }} Create administrator</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}

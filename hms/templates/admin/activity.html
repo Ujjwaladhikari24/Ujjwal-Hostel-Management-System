@@ -1,0 +1,43 @@
+{% extends "dashboard_base.html" %}
+{% from 'partials/macros.html' import icon, badge, pager, empty %}
+{% block title %}Activity Log — {{ hostel_name }}{% endblock %}
+{% block page_title %}Activity log{% endblock %}
+{% block page_sub %}Audit trail of every important action{% endblock %}
+
+{% block page_header %}
+<div class="page-head">
+  <div>
+    <div class="breadcrumb"><a href="{{ url_for('admin.overview') }}">Overview</a> {{ icon('chevron-right') }} <span>Activity</span></div>
+    <h1>Audit trail</h1>
+    <p>Sign-ins, record changes and financial entries — useful for traceability during audits.</p>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_content %}
+<section class="card" data-anim>
+  <div class="card-head"><h3>{{ icon('scroll-text') }} Recent activity</h3><span class="badge muted">{{ page.total }} entries</span></div>
+  {% if rows %}
+  <div class="table-wrap">
+    <table class="data">
+      <thead><tr><th>When</th><th>Actor</th><th>Action</th><th>Entity</th><th>Detail</th><th>IP</th></tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td class="tiny nowrap">{{ r.created_at|dt }}</td>
+          <td>{{ badge(r.actor or 'guest', 'brand') }}</td>
+          <td class="t-title">{{ r.action }}</td>
+          <td class="tiny muted">{{ r.entity or '—' }}</td>
+          <td class="tiny">{{ r.detail or '—' }}</td>
+          <td class="tiny mono muted">{{ r.ip or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {{ pager(page) }}
+  {% else %}
+    {{ empty('scroll-text', 'No activity recorded', 'Actions performed by administrators and students will appear here.') }}
+  {% endif %}
+</section>
+{% endblock %}

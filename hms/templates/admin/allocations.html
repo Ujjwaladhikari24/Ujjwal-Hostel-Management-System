@@ -1,0 +1,171 @@
+{% extends "dashboard_base.html" %}
+{% from 'partials/macros.html' import icon, avatar, status_badge, badge, empty, pager %}
+{% block title %}Room Allocation — {{ hostel_name }}{% endblock %}
+{% block page_title %}Room allocation{% endblock %}
+{% block page_sub %}{{ occupied_beds }} of {{ total_beds }} beds allocated{% endblock %}
+
+{% block page_header %}
+<div class="page-head">
+  <div>
+    <div class="breadcrumb"><a href="{{ url_for('admin.overview') }}">Overview</a> {{ icon('chevron-right') }} <span>Allocation</span></div>
+    <h1>Allocate beds</h1>
+    <p>Assign residents to available beds. The system blocks any allocation that exceeds room capacity.</p>
+  </div>
+  <div class="page-actions">
+    <a class="btn btn-outline" href="{{ url_for('admin.export_csv', kind='allocations') }}">{{ icon('download') }} Export CSV</a>
+    <a class="btn btn-outline" href="{{ url_for('admin.rooms') }}">{{ icon('building-2') }} Room status</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_content %}
+<div class="grid-1-2" style="align-items:start">
+  <section class="card" data-anim>
+    <div class="card-head"><h3>{{ icon('user-plus') }} Assign a bed</h3></div>
+    <form class="card-body" method="post" action="{{ url_for('admin.allocation_new') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="field">
+        <label for="student_id">Student <span class="req">*</span></label>
+        <select id="student_id" name="student_id" required>
+          <option value="">Select a student…</option>
+          {% for s in unallocated %}
+            <option value="{{ s.id }}">{{ s.user.name }} · {{ s.enrollment_no }} · {{ s.year or '—' }}</option>
+          {% endfor %}
+        </select>
+        <span class="hint">
+          {% if unallocated %}{{ unallocated|length }} active student(s) without a room.{% else %}All active students already have a room.{% endif %}
+        </span>
+      </div>
+      <div class="field">
+        <label for="room_id">Room <span class="req">*</span></label>
+        <select id="room_id" name="room_id" required>
+          <option value="">Select a room with free beds…</option>
+          {% for r in rooms %}
+            <option value="{{ r.id }}">Room {{ r.room_number }} · {{ r.room_type }} · {{ r.free_beds }} bed(s) free · floor {{ r.floor }}</option>
+          {% endfor %}
+        </select>
+        {% if not rooms %}<span class="hint">No rooms with free beds. <a href="{{ url_for('admin.rooms') }}">Check room status</a>.</span>{% endif %}
+      </div>
+      <div class="form-grid">
+        <div class="field">
+          <label for="bed_number">Bed number</label>
+          <input id="bed_number" type="number" name="bed_number" min="1" max="8" placeholder="Auto">
+        </div>
+        <div class="field">
+          <label for="start_date">From date</label>
+          <input id="start_date" type="date" name="start_date" value="{{ today.isoformat() }}">
+        </div>
+      </div>
+      <div class="field">
+        <label for="note">Note</label>
+        <input id="note" type="text" name="note" maxlength="255" placeholder="Reason / remarks (optional)">
+      </div>
+      <button class="btn btn-primary btn-block" type="submit" {{ 'disabled' if not rooms or not unallocated }}>{{ icon('bed-double') }} Allocate bed</button>
+    </form>
+  </section>
+
+  <div class="stack">
+    <section class="card" data-anim>
+      <div class="card-head">
+        <h3>{{ icon('bed-double') }} Current allocations</h3>
+        <form class="filters" method="get" action="{{ url_for('admin.allocations') }}">
+          <input type="search" name="q" value="{{ q }}" placeholder="Student, enrollment or room…" aria-label="Search allocations">
+          <button class="btn btn-outline btn-sm" type="submit">{{ icon('search', 'i-sm') }}</button>
+        </form>
+      </div>
+      {% if rows %}
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr><th>Student</th><th>Room</th><th>Bed</th><th>Since</th><th>Actions</th></tr></thead>
+          <tbody>
+            {% for a in rows %}
+            <tr>
+              <td>
+                <div class="row">
+                  {{ avatar(a.student.user, 'sm') }}
+                  <div>
+                    <div class="t-title">{{ a.student.user.name }}</div>
+                    <div class="t-sub">{{ a.student.enrollment_no }}</div>
+                  </div>
+                </div>
+              </td>
+              <td>{{ badge(a.room.room_number, 'info') }}<div class="t-sub">{{ a.room.room_type }}</div></td>
+              <td>{{ a.bed_number }} / {{ a.room.capacity }}</td>
+              <td class="tiny">{{ a.start_date|date }}</td>
+              <td>
+                <div class="table-actions">
+                  <button class="btn btn-ghost btn-sm" title="Transfer room"
+                          data-modal-open="transferModal"
+                          data-field-form_action="{{ url_for('admin.allocation_change', alloc_id=a.id) }}"
+                          data-label-student="{{ a.student.user.name }} ({{ a.room.room_number }})">{{ icon('arrow-right-left', 'i-sm') }}</button>
+                  <form method="post" action="{{ url_for('admin.allocation_vacate', alloc_id=a.id) }}"
+                        data-confirm="Vacate room {{ a.room.room_number }} for {{ a.student.user.name }}?">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn-danger-soft btn-sm" type="submit" title="Vacate">{{ icon('log-out', 'i-sm') }}</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        {{ empty('bed-single', 'No allocations yet', 'Assign the first bed using the form on the left.') }}
+      {% endif %}
+    </section>
+
+    <section class="card" data-anim>
+      <div class="card-head"><h3>{{ icon('history') }} Allocation history</h3><span class="badge muted">audit trail</span></div>
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr><th>Student</th><th>Room</th><th>Bed</th><th>From</th><th>To</th><th>Status</th></tr></thead>
+          <tbody>
+            {% for a in history %}
+            <tr>
+              <td class="t-title">{{ a.student.user.name }}<div class="t-sub">{{ a.student.enrollment_no }}</div></td>
+              <td>{{ a.room.room_number }}</td>
+              <td>{{ a.bed_number }}</td>
+              <td class="tiny">{{ a.start_date|date }}</td>
+              <td class="tiny">{{ a.end_date|date if a.end_date else '—' }}</td>
+              <td>{{ status_badge('Active' if a.is_active else 'Closed') }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6"><p class="tiny muted" style="margin:.5rem 0">No history recorded.</p></td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {{ pager(page) }}
+    </section>
+  </div>
+</div>
+
+<dialog class="modal" id="transferModal">
+  <form method="post" action="" id="transferForm">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="modal-head">
+      <h3>{{ icon('arrow-right-left') }} Transfer student</h3>
+      <button class="icon-btn" type="button" data-modal-close>{{ icon('x') }}</button>
+    </div>
+    <div class="modal-body">
+      <p class="tiny muted">Moving <strong data-label="student">student</strong> to a different room closes the current allocation and opens a new one.</p>
+      <div class="field">
+        <label for="new_room">New room</label>
+        <select id="new_room" name="room_id" required>
+          <option value="">Select a room with free beds…</option>
+          {% for r in rooms %}<option value="{{ r.id }}">Room {{ r.room_number }} · {{ r.room_type }} · {{ r.free_beds }} free</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="new_bed">Bed number</label>
+        <input id="new_bed" type="number" name="bed_number" min="1" max="8" placeholder="Auto">
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" type="button" data-modal-close>Cancel</button>
+      <button class="btn btn-primary" type="submit">{{ icon('check', 'i-sm') }} Confirm transfer</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}

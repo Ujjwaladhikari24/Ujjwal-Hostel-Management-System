@@ -1,0 +1,230 @@
+{% extends "dashboard_base.html" %}
+{% from 'partials/macros.html' import icon, kpi, status_badge, badge, empty, progress %}
+{% block title %}Admin Overview — {{ hostel_name }}{% endblock %}
+{% block page_title %}Overview{% endblock %}
+{% block page_sub %}{{ hostel_name }} · live figures from the database{% endblock %}
+
+{% block page_header %}
+<div class="page-head">
+  <div>
+    <div class="breadcrumb">{{ icon('home') }} <span>Admin</span> {{ icon('chevron-right') }} <span>Overview</span></div>
+    <h1>Good to see you, {{ current_user.name.split(' ')[0] }}</h1>
+    <p>Here is the current state of {{ hostel_name }} — every number below is calculated from live records.</p>
+  </div>
+  <div class="page-actions">
+    <a class="btn btn-outline" href="{{ url_for('admin.student_new') }}">{{ icon('user-plus') }} Add student</a>
+    <a class="btn btn-outline" href="{{ url_for('admin.room_new') }}">{{ icon('plus') }} Add room</a>
+    <a class="btn btn-primary" href="{{ url_for('admin.allocations') }}">{{ icon('bed-double') }} Allocate bed</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_content %}
+<div class="kpi-grid">
+  {{ kpi('brand', 'users-round', 'Active students', stats.students, stats.unallocated ~ ' awaiting room') }}
+  {{ kpi('teal', 'building-2', 'Rooms', stats.rooms, stats.full_rooms ~ ' full · ' ~ stats.available_rooms ~ ' empty') }}
+  {{ kpi('navy', 'bed-double', 'Beds occupied', stats.occupied_beds ~ ' / ' ~ stats.capacity, stats.occupancy_pct ~ '% occupancy') }}
+  {{ kpi('green', 'wallet', 'Fees collected', '₹' ~ '{:,.0f}'.format(stats.collected), stats.collection_pct ~ '% of ₹' ~ '{:,.0f}'.format(stats.billed) ~ ' billed') }}
+  {{ kpi('sunset', 'alert-circle', 'Outstanding dues', '₹' ~ '{:,.0f}'.format(stats.outstanding), stats.students_with_dues ~ ' student(s) with balance') }}
+  {{ kpi('orange', 'message-square-warning', 'Pending complaints', stats.complaints_pending, stats.complaints_progress ~ ' in progress · ' ~ stats.complaints_resolved ~ ' resolved') }}
+</div>
+
+<div class="grid-2-1">
+  <div class="stack">
+    <section class="card" data-anim>
+      <div class="card-head">
+        <h3>{{ icon('trending-up') }} Fee collection (last 6 months)</h3>
+        <span class="badge muted">collected vs billed</span>
+      </div>
+      <div class="card-body">
+        <div class="chart-box h-260"><canvas id="feeChart"></canvas></div>
+      </div>
+    </section>
+
+    <section class="card" data-anim>
+      <div class="card-head">
+        <h3>{{ icon('message-square-warning') }} Latest complaints</h3>
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.complaints') }}">Manage {{ icon('arrow-right', 'i-sm') }}</a>
+      </div>
+      {% if recent_complaints %}
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr><th>Ticket</th><th>Student</th><th>Subject</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            {% for c in recent_complaints %}
+            <tr>
+              <td class="mono tiny">{{ c.ticket_no }}</td>
+              <td class="nowrap-cell">
+                <div class="t-title">{{ c.student.user.name }}</div>
+                <div class="t-sub">{{ c.student.enrollment_no }}</div>
+              </td>
+              <td>
+                <div class="t-title">{{ c.subject|truncate(52) }}</div>
+                <div class="t-sub">{{ c.category }} &middot; {{ c.created_at|ago }}</div>
+              </td>
+              <td>{{ status_badge(c.status) }}</td>
+              <td class="right"><a class="btn btn-outline btn-sm" href="{{ url_for('admin.complaint_detail', complaint_id=c.id) }}">Open</a></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        {{ empty('inbox', 'No complaints logged', 'When students raise issues they will appear here for action.') }}
+      {% endif %}
+    </section>
+
+    <section class="card" data-anim>
+      <div class="card-head"><h3>{{ icon('wallet-cards') }} Recent payments</h3><a class="btn btn-ghost btn-sm" href="{{ url_for('admin.payments') }}">All payments {{ icon('arrow-right', 'i-sm') }}</a></div>
+      {% if recent_payments %}
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr><th>Receipt</th><th>Student</th><th>Method</th><th>Date</th><th class="num">Amount</th></tr></thead>
+          <tbody>
+            {% for p in recent_payments %}
+            <tr>
+              <td class="mono tiny">{{ p.receipt_no }}</td>
+              <td class="t-title">{{ p.student.user.name }}<div class="t-sub">{{ p.student.enrollment_no }}</div></td>
+              <td>{{ badge(p.method, 'brand') }}</td>
+              <td class="tiny">{{ p.paid_on|date }}</td>
+              <td class="num" style="font-weight:700">₹{{ '{:,.0f}'.format(p.amount) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        {{ empty('wallet', 'No payments recorded', 'Record a payment from Fee Management to populate this list.') }}
+      {% endif %}
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="card" data-anim>
+      <div class="card-head"><h3>{{ icon('bed-double') }} Occupancy by room type</h3></div>
+      <div class="card-body">
+        {% if type_labels %}
+          <div class="chart-box h-200"><canvas id="typeChart"></canvas></div>
+          <div class="legend">
+            <span><i style="background:#2f4bff"></i> Occupied</span>
+            <span><i style="background:#e2e8f5"></i> Free</span>
+          </div>
+        {% else %}
+          <p class="tiny muted">No rooms added yet. <a href="{{ url_for('admin.room_new') }}">Add the first room</a>.</p>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="card" data-anim>
+      <div class="card-head"><h3>{{ icon('pie-chart') }} Complaint status</h3></div>
+      <div class="card-body">
+        {% if stats.complaints_total %}
+          <div class="chart-box h-200"><canvas id="complaintChart"></canvas></div>
+        {% else %}
+          <p class="tiny muted">No complaints recorded yet — the chart fills in automatically.</p>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="card" data-anim>
+      <div class="card-head"><h3>{{ icon('door-open') }} Room status</h3><a class="btn btn-ghost btn-sm" href="{{ url_for('admin.rooms') }}">All rooms</a></div>
+      <div class="card-body stack-sm">
+        {% for label, cls, count in [
+            ('Available', 'ok', stats.available_rooms),
+            ('Partially occupied', 'warn', room_status_counts.get('Partially Occupied', 0)),
+            ('Full', 'info', stats.full_rooms),
+            ('Under maintenance', 'danger', stats.maintenance_rooms)] %}
+        <div class="row-between" style="font-size:.85rem">
+          <span class="row" style="gap:.45rem">{{ badge('', cls, true) }} {{ label }}</span>
+          <strong>{{ count }}</strong>
+        </div>
+        {% endfor %}
+        <hr class="sep" style="margin:.4rem 0">
+        <div class="row-between tiny muted"><span>Beds free right now</span><strong>{{ stats.free_beds }}</strong></div>
+        {{ progress(stats.occupancy_pct, 'teal') }}
+      </div>
+    </section>
+
+    <section class="card" data-anim>
+      <div class="card-head"><h3>{{ icon('calendar-clock') }} Upcoming due dates</h3></div>
+      <div class="card-body">
+        {% if upcoming_dues %}
+          <div class="timeline">
+            {% for f in upcoming_dues %}
+            <div class="timeline-item {{ 'warn' if f.balance > 0 else 'ok' }}">
+              <div class="t-what">{{ f.student.user.name }} · ₹{{ '{:,.0f}'.format(f.amount) }}</div>
+              <div class="tiny muted">{{ f.title }} · due {{ f.due_date|date }}</div>
+            </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="tiny muted">No upcoming fee due dates scheduled.</p>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="card" data-anim>
+      <div class="card-head"><h3>{{ icon('scroll-text') }} Recent activity</h3><a class="btn btn-ghost btn-sm" href="{{ url_for('admin.activity') }}">Log</a></div>
+      <div class="card-body">
+        {% if recent_activity %}
+        <div class="timeline">
+          {% for a in recent_activity %}
+          <div class="timeline-item">
+            <div class="t-what">{{ a.action }}</div>
+            <div class="tiny muted">{{ a.actor }}{% if a.detail %} · {{ a.detail }}{% endif %}</div>
+            <div class="t-when">{{ a.created_at|ago }}</div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+          <p class="tiny muted">Actions performed in the console are recorded here.</p>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  HMS_CHART('feeChart', {
+    data: {
+      labels: {{ month_labels|tojson }},
+      datasets: [
+        { type: 'bar', label: 'Collected', data: {{ month_collected|tojson }}, backgroundColor: 'rgba(47,75,255,.85)', order: 2 },
+        { type: 'line', label: 'Billed', data: {{ month_billed|tojson }}, borderColor: '#f97316', backgroundColor: 'rgba(249,115,22,.12)', fill: true, order: 1 }
+      ]
+    },
+    plugins: { legend: { display: true } },
+    scales: {
+      x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+      y: { beginAtZero: true, grid: {}, ticks: { font: { size: 11 }, callback: function (v) { return v >= 1000 ? '₹' + Math.round(v / 1000) + 'k' : '₹' + v; } } }
+    }
+  });
+
+  {% if type_labels %}
+  HMS_CHART('typeChart', {
+    type: 'bar',
+    data: {
+      labels: {{ type_labels|tojson }},
+      datasets: [
+        { label: 'Occupied', data: {{ type_occupied|tojson }}, backgroundColor: '#2f4bff', borderRadius: 7 },
+        { label: 'Free', data: [{% for i in range(type_capacity|length) %}{{ type_capacity[i] - type_occupied[i] }}{{ ',' if not loop.last }}{% endfor %}], backgroundColor: '#e2e8f5', borderRadius: 7 }
+      ]
+    },
+    options: { indexAxis: 'y', scales: { x: { stacked: true, grid: {}, ticks: {} }, y: { stacked: true, grid: { display: false }, ticks: {} } }, plugins: { legend: { display: false } } }
+  });
+  {% endif %}
+
+  {% if stats.complaints_total %}
+  HMS_CHART('complaintChart', {
+    type: 'doughnut',
+    data: {
+      labels: {{ complaint_labels|tojson }},
+      datasets: [{ data: {{ complaint_values|tojson }}, backgroundColor: ['#f59e0b', '#0ea5e9', '#10b981', '#ef4444'], borderWidth: 3, borderColor: '#fff', hoverOffset: 6 }]
+    },
+    options: { cutout: '62%', plugins: { legend: { display: true, position: 'bottom' } } }
+  });
+  {% endif %}
+</script>
+{% endblock %}

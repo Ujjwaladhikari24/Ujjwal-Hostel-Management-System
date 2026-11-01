@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% from 'partials/macros.html' import icon %}
+{% block title %}403 — Access denied{% endblock %}
+{% block content %}
+<div class="container" style="min-height:80vh;display:grid;place-items:center;text-align:center">
+  <div style="max-width:520px">
+    <div class="empty-icon" style="width:84px;height:84px;border-radius:26px;display:grid;place-items:center;margin:0 auto 1.2rem;background:linear-gradient(135deg,rgba(239,68,68,.14),rgba(249,115,22,.16));color:#dc2626">{{ icon('shield-x', 'i-xl') }}</div>
+    <span class="eyebrow center">403 · Forbidden</span>
+    <h1>You don't have access to this page</h1>
+    <p class="muted">This area is restricted to a different role. Students cannot open administrator pages, and administrators use their own console.</p>
+    <div class="row center" style="justify-content:center;gap:.6rem;margin-top:1.4rem">
+      <a class="btn btn-primary" href="{{ url_for('public.home') }}">{{ icon('home') }} Home</a>
+      <a class="btn btn-outline" href="{{ url_for('auth.logout') }}">{{ icon('log-out') }} Sign in as someone else</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

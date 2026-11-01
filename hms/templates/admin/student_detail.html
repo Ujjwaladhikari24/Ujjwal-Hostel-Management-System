@@ -1,0 +1,358 @@
+{% extends "dashboard_base.html" %}
+{% from 'partials/macros.html' import icon, avatar, status_badge, badge, empty, kpi %}
+{% block title %}{{ student.user.name }} — {{ hostel_name }}{% endblock %}
+{% block page_title %}Student profile{% endblock %}
+{% block page_sub %}{{ student.enrollment_no }}{% endblock %}
+
+{% block page_header %}
+<div class="page-head">
+  <div>
+    <div class="breadcrumb"><a href="{{ url_for('admin.students') }}">Students</a> {{ icon('chevron-right') }} <span>{{ student.enrollment_no }}</span></div>
+    <h1>{{ student.user.name }}</h1>
+    <p>{{ student.course or 'Course not set' }}{% if student.department %} · {{ student.department }}{% endif %} · {{ student.year or 'Year not set' }}</p>
+  </div>
+  <div class="page-actions">
+    <button class="btn btn-outline" data-modal-open="passwordModal">{{ icon('key-round') }} Reset password</button>
+    <a class="btn btn-outline" href="{{ url_for('admin.student_edit', student_id=student.id) }}">{{ icon('pencil') }} Edit</a>
+    <a class="btn btn-primary" href="{{ url_for('admin.payments') }}#record">{{ icon('wallet') }} Payment</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_content %}
+<div class="kpi-grid">
+  {{ kpi('brand', 'receipt-indian-rupee', 'Total billed', '₹' ~ '{:,.0f}'.format(billed), fees|length ~ ' fee record(s)') }}
+  {{ kpi('green', 'wallet', 'Amount paid', '₹' ~ '{:,.0f}'.format(paid), payments|length ~ ' receipt(s)') }}
+  {{ kpi('sunset', 'alert-circle', 'Outstanding', '₹' ~ '{:,.0f}'.format(balance), 'Balance as of today') }}
+  {{ kpi('teal', 'message-square-warning', 'Complaints', complaints|length, (complaints|selectattr('status','equalto','Resolved')|list|length) ~ ' resolved') }}
+</div>
+
+<div class="grid-2-1" style="align-items:start">
+  <div class="stack">
+    <section class="card" data-anim>
+      <div class="card-head"><h3>{{ icon('user-round') }} Student information</h3>{{ status_badge(student.status) }}</div>
+      <div class="card-body">
+        <div class="grid-2" style="gap:0 1.5rem">
+          <div class="info-list">
+            <div class="info-row"><span class="k">Full name</span><span class="v">{{ student.user.name }}</span></div>
+            <div class="info-row"><span class="k">Enrollment no.</span><span class="v mono">{{ student.enrollment_no }}</span></div>
+            <div class="info-row"><span class="k">Email</span><span class="v">{{ student.user.email }}</span></div>
+            <div class="info-row"><span class="k">Phone</span><span class="v">{{ student.user.phone or '—' }}</span></div>
+            <div class="info-row"><span class="k">Course</span><span class="v">{{ student.course or '—' }}</span></div>
+            <div class="info-row"><span class="k">Department</span><span class="v">{{ student.department or '—' }}</span></div>
+          </div>
+          <div class="info-list">
+            <div class="info-row"><span class="k">Year / semester</span><span class="v">{{ student.year or '—' }}</span></div>
+            <div class="info-row"><span class="k">Guardian</span><span class="v">{{ student.guardian_name or '—' }}</span></div>
+            <div class="info-row"><span class="k">Guardian phone</span><span class="v">{{ student.guardian_phone or '—' }}</span></div>
+            <div class="info-row"><span class="k">Address</span><span class="v" style="max-width:60%">{{ student.address or '—' }}</span></div>
+            <div class="info-row"><span class="k">Registered</span><span class="v">{{ student.created_at|date }}</span></div>
+            <div class="info-row"><span class="k">Sign-in access</span><span class="v">{{ 'Enabled' if student.user.is_active else 'Blocked' }}</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" data-anim>
+      <div class="card-head">
+        <h3>{{ icon('receipt-indian-rupee') }} Fee records</h3>
+        <button class="btn btn-primary btn-sm" data-modal-open="feeModal">{{ icon('plus', 'i-sm') }} Assign fee</button>
+      </div>
+      {% if fees %}
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr><th>Fee head</th><th>Due date</th><th class="num">Amount</th><th class="num">Paid</th><th class="num">Balance</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            {% for f in fees %}
+            <tr>
+              <td class="t-title">{{ f.title }}<div class="t-sub">{{ f.semester or '' }}</div></td>
+              <td class="tiny">{{ f.due_date|date }}</td>
+              <td class="num">₹{{ '{:,.0f}'.format(f.amount) }}</td>
+              <td class="num">₹{{ '{:,.0f}'.format(f.paid_amount) }}</td>
+              <td class="num" style="font-weight:700">₹{{ '{:,.0f}'.format(f.balance) }}</td>
+              <td>{{ status_badge(f.status) }}</td>
+              <td class="right">
+                <div class="table-actions">
+                  <button class="btn btn-teal btn-sm" data-modal-open="payModal"
+                          data-field-student_id="{{ student.id }}"
+                          data-field-fee_record_id="{{ f.id }}"
+                          data-field-amount="{{ f.balance if f.balance > 0 else f.amount }}"
+                          data-label-fee="{{ f.title }}">{{ icon('wallet', 'i-sm') }} Pay</button>
+                  {% if not f.payments %}
+                  <form method="post" action="{{ url_for('admin.fee_delete', fee_id=f.id) }}" data-confirm="Delete this fee record?">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn-ghost btn-sm" type="submit">{{ icon('trash-2', 'i-sm') }}</button>
+                  </form>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        {{ empty('receipt', 'No fees assigned', 'Use “Assign fee” to bill this student for hostel charges.') }}
+      {% endif %}
+    </section>
+
+    <section class="card" data-anim>
+      <div class="card-head">
+        <h3>{{ icon('history') }} Payment history</h3>
+        <div class="row" style="gap:.4rem">
+          <button class="btn btn-primary btn-sm" data-modal-open="payModal" data-field-student_id="{{ student.id }}">{{ icon('plus', 'i-sm') }} Record payment</button>
+          <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.export_csv', kind='payments') }}">{{ icon('download', 'i-sm') }}</a>
+        </div>
+      </div>
+      {% if payments %}
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr><th>Receipt</th><th>Date</th><th>Method</th><th>Fee head</th><th class="num">Amount</th><th></th></tr></thead>
+          <tbody>
+            {% for p in payments %}
+            <tr>
+              <td class="mono tiny">{{ p.receipt_no }}</td>
+              <td class="tiny">{{ p.paid_on|date }}</td>
+              <td>{{ badge(p.method, 'brand') }}</td>
+              <td class="tiny">{{ p.fee_record.title if p.fee_record else 'General' }}</td>
+              <td class="num" style="font-weight:700">₹{{ '{:,.0f}'.format(p.amount) }}</td>
+              <td class="right">
+                <div class="table-actions">
+                  <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.payment_receipt', payment_id=p.id) }}" target="_blank">{{ icon('file-text', 'i-sm') }}</a>
+                  <form method="post" action="{{ url_for('admin.payment_delete', payment_id=p.id) }}" data-confirm="Delete payment {{ p.receipt_no }}? This cannot be undone.">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn-ghost btn-sm" type="submit">{{ icon('trash-2', 'i-sm') }}</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        {{ empty('wallet', 'No payments yet', 'Payments recorded here generate a receipt number for the student.') }}
+      {% endif %}
+    </section>
+
+    <section class="card" data-anim>
+      <div class="card-head"><h3>{{ icon('message-square-warning') }} Complaints</h3></div>
+      {% if complaints %}
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr><th>Ticket</th><th>Subject</th><th>Category</th><th>Raised</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            {% for c in complaints %}
+            <tr>
+              <td class="mono tiny">{{ c.ticket_no }}</td>
+              <td class="t-title">{{ c.subject|truncate(40) }}</td>
+              <td class="tiny">{{ c.category }}</td>
+              <td class="tiny">{{ c.created_at|date }}</td>
+              <td>{{ status_badge(c.status) }}</td>
+              <td class="right"><a class="btn btn-ghost btn-sm" href="{{ url_for('admin.complaint_detail', complaint_id=c.id) }}">{{ icon('arrow-up-right', 'i-sm') }}</a></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        <div class="card-body"><p class="tiny muted" style="margin:0">No complaints raised by this student.</p></div>
+      {% endif %}
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="card" data-anim>
+      <div class="card-head"><h3>{{ icon('bed-double') }} Accommodation</h3></div>
+      <div class="card-body">
+        {% if student.active_allocation %}
+          {% set a = student.active_allocation %}
+          <div class="info-list">
+            <div class="info-row"><span class="k">Room</span><span class="v">{{ a.room.room_number }} · {{ a.room.room_type }}</span></div>
+            <div class="info-row"><span class="k">Bed</span><span class="v">{{ a.bed_number }} of {{ a.room.capacity }}</span></div>
+            <div class="info-row"><span class="k">Floor / block</span><span class="v">{{ a.room.floor }}{% if a.room.block %} · {{ a.room.block }}{% endif %}</span></div>
+            <div class="info-row"><span class="k">Since</span><span class="v">{{ a.start_date|date }}</span></div>
+          </div>
+          <form method="post" action="{{ url_for('admin.allocation_vacate', alloc_id=a.id) }}" data-confirm="Vacate room {{ a.room.room_number }} for {{ student.user.name }}?" style="margin-top:1rem">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-danger-soft btn-block" type="submit">{{ icon('log-out', 'i-sm') }} Vacate room</button>
+          </form>
+          <form method="post" action="{{ url_for('admin.allocation_change', alloc_id=a.id) }}" style="margin-top:.6rem">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="field" style="margin-bottom:.5rem">
+              <label for="change_room">Transfer to another room</label>
+              <select id="change_room" name="room_id" required>
+                <option value="">Select a room with free beds…</option>
+                {% for r in rooms %}<option value="{{ r.id }}">Room {{ r.room_number }} · {{ r.room_type }} · {{ r.free_beds }} free</option>{% endfor %}
+              </select>
+            </div>
+            <button class="btn btn-outline btn-block btn-sm" type="submit">{{ icon('arrow-right-left', 'i-sm') }} Move student</button>
+          </form>
+        {% else %}
+          <p class="tiny muted">No active allocation. Assign a bed below — only rooms with free beds are listed.</p>
+          <form method="post" action="{{ url_for('admin.allocation_new') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="student_id" value="{{ student.id }}">
+            <div class="field">
+              <label for="room_new">Assign a room</label>
+              <select id="room_new" name="room_id" required>
+                <option value="">Select a room…</option>
+                {% for r in rooms %}<option value="{{ r.id }}">Room {{ r.room_number }} · {{ r.room_type }} · {{ r.free_beds }} free</option>{% endfor %}
+              </select>
+            </div>
+            <div class="field">
+              <label for="bed_new">Bed number</label>
+              <input id="bed_new" type="number" name="bed_number" min="1" max="8" placeholder="Auto">
+            </div>
+            <button class="btn btn-primary btn-block btn-sm" type="submit">{{ icon('bed-double', 'i-sm') }} Allocate bed</button>
+          </form>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="card" data-anim>
+      <div class="card-head"><h3>{{ icon('route') }} Allocation history</h3></div>
+      <div class="card-body">
+        <div class="timeline">
+          {% for a in allocations %}
+          <div class="timeline-item {{ 'ok' if a.is_active else '' }}">
+            <div class="t-what">Room {{ a.room.room_number }} · bed {{ a.bed_number }}</div>
+            <div class="t-when">{{ a.start_date|date }} → {{ a.end_date|date if a.end_date else 'present' }}</div>
+          </div>
+          {% else %}
+          <p class="tiny muted">No allocation history.</p>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+
+    <section class="card card-pad" data-anim>
+      <h3 style="font-size:.96rem">{{ icon('settings-2') }} Account actions</h3>
+      <form method="post" action="{{ url_for('admin.student_toggle', student_id=student.id) }}" data-confirm="Change status for {{ student.user.name }}?">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-outline btn-block btn-sm" type="submit">
+          {{ icon('power', 'i-sm') }} {{ 'Deactivate account' if student.status == 'Active' else 'Reactivate account' }}
+        </button>
+      </form>
+      <form method="post" action="{{ url_for('admin.student_delete', student_id=student.id) }}"
+            data-confirm="Permanently delete {{ student.user.name }}? Only allowed when there is no fee or payment history." style="margin-top:.5rem">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-danger-soft btn-block btn-sm" type="submit">{{ icon('trash-2', 'i-sm') }} Delete student</button>
+      </form>
+      <p class="tiny muted" style="margin:.7rem 0 0">
+        Deleting is blocked once fees or payments exist, so financial history is never lost.
+      </p>
+    </section>
+  </div>
+</div>
+
+<!-- reset password modal -->
+<dialog class="modal" id="passwordModal">
+  <form method="post" action="{{ url_for('admin.student_reset_password', student_id=student.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="modal-head">
+      <h3>{{ icon('key-round') }} Reset password</h3>
+      <button class="icon-btn" type="button" data-modal-close>{{ icon('x') }}</button>
+    </div>
+    <div class="modal-body">
+      <p class="tiny muted">Set a new password for <strong>{{ student.user.name }}</strong>. They will be notified in-app and should change it after signing in.</p>
+      <div class="field">
+        <label for="new_password">New password</label>
+        <input id="new_password" type="password" name="new_password" required minlength="8" autocomplete="new-password">
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" type="button" data-modal-close>Cancel</button>
+      <button class="btn btn-primary" type="submit">{{ icon('save', 'i-sm') }} Update password</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- assign fee modal -->
+<dialog class="modal" id="feeModal">
+  <form method="post" action="{{ url_for('admin.fee_new') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="target" value="single">
+    <input type="hidden" name="student_id" value="{{ student.id }}">
+    <div class="modal-head">
+      <h3>{{ icon('receipt-indian-rupee') }} Assign a fee</h3>
+      <button class="icon-btn" type="button" data-modal-close>{{ icon('x') }}</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="field full">
+          <label for="fee_title">Fee head</label>
+          <input id="fee_title" type="text" name="title" value="Hostel Fee" required maxlength="120">
+        </div>
+        <div class="field">
+          <label for="fee_amount">Amount (₹)</label>
+          <input id="fee_amount" type="number" name="amount" min="1" step="1" required>
+        </div>
+        <div class="field">
+          <label for="fee_due">Due date</label>
+          <input id="fee_due" type="date" name="due_date" required value="{{ today.isoformat() }}">
+        </div>
+        <div class="field full">
+          <label for="fee_sem">Semester / session</label>
+          <input id="fee_sem" type="text" name="semester" value="{{ academic_session }}" maxlength="40">
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" type="button" data-modal-close>Cancel</button>
+      <button class="btn btn-primary" type="submit">{{ icon('save', 'i-sm') }} Assign fee</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- record payment modal -->
+<dialog class="modal" id="payModal">
+  <form method="post" action="{{ url_for('admin.payment_new') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="student_id" value="{{ student.id }}">
+    <div class="modal-head">
+      <h3>{{ icon('wallet') }} Record a payment</h3>
+      <button class="icon-btn" type="button" data-modal-close>{{ icon('x') }}</button>
+    </div>
+    <div class="modal-body">
+      <div class="alert info">
+        {{ icon('info') }}
+        <div>Administrator-recorded payment. No online gateway is involved — enter the amount actually received at the office.</div>
+      </div>
+      <div class="form-grid">
+        <div class="field">
+          <label for="pay_fee">Against fee record</label>
+          <select id="pay_fee" name="fee_record_id">
+            <option value="">General payment (no specific fee)</option>
+            {% for f in fees %}
+              <option value="{{ f.id }}" {{ 'disabled' if f.balance <= 0 }}>{{ f.title }} · balance ₹{{ '{:,.0f}'.format(f.balance) }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="pay_amount">Amount received (₹)</label>
+          <input id="pay_amount" type="number" name="amount" min="1" step="0.01" required>
+        </div>
+        <div class="field">
+          <label for="pay_method">Method</label>
+          <select id="pay_method" name="method">
+            {% for m in ['Cash', 'UPI', 'Bank Transfer', 'Other'] %}<option value="{{ m }}">{{ m }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="pay_on">Payment date</label>
+          <input id="pay_on" type="date" name="paid_on" value="{{ today.isoformat() }}" required>
+        </div>
+        <div class="field full">
+          <label for="pay_ref">Reference / UTR (optional)</label>
+          <input id="pay_ref" type="text" name="reference" maxlength="80" placeholder="UPI ref, cheque no., receipt book no.">
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" type="button" data-modal-close>Cancel</button>
+      <button class="btn btn-teal" type="submit">{{ icon('badge-check', 'i-sm') }} Record payment</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}

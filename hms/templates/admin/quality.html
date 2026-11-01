@@ -1,0 +1,287 @@
+{% extends "dashboard_base.html" %}
+{% from 'partials/macros.html' import icon, badge, kpi, empty, status_badge %}
+{% block title %}Quality (TQM) — {{ hostel_name }}{% endblock %}
+{% block page_title %}Quality &amp; TQM{% endblock %}
+{% block page_sub %}Pareto analysis, FMEA register and PDCA log{% endblock %}
+
+{% block page_header %}
+<div class="page-head">
+  <div>
+    <div class="breadcrumb"><a href="{{ url_for('admin.overview') }}">Overview</a> {{ icon('chevron-right') }} <span>Quality</span></div>
+    <h1>Continuous improvement dashboard</h1>
+    <p>Complaint data doubles as defect data — the vital few categories drive most of the workload (Pareto 80/20).</p>
+  </div>
+  <div class="page-actions">
+    <a class="btn btn-outline" href="{{ url_for('admin.reports') }}">{{ icon('chart-pie') }} Reports</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_content %}
+<div class="kpi-grid">
+  {{ kpi('brand', 'target', 'Resolution rate', ctq.rate ~ '%', ctq.resolved ~ ' of ' ~ ctq.total ~ ' tickets closed') }}
+  {{ kpi('teal', 'timer', 'Avg. resolution time', (ctq.avg_hours ~ ' h') if ctq.total else '0 h', ctq.sla ~ ' ticket(s) closed within 48 h') }}
+  {{ kpi('orange', 'bug', 'Open defects', ctq.open_defects, 'from the defect / FMEA log') }}
+  {{ kpi('sunset', 'shield-alert', 'Highest RPN', ctq.max_rpn, 'risk priority number') }}
+</div>
+
+<div class="grid-2-1" style="align-items:start">
+  <div class="stack">
+    <section class="card" data-anim>
+      <div class="card-head">
+        <h3>{{ icon('chart-no-axes-column-increasing') }} Pareto analysis — complaints by category</h3>
+        <span class="badge brand">80/20 rule</span>
+      </div>
+      <div class="card-body">
+        {% if pareto %}
+          <div class="chart-box h-300"><canvas id="paretoChart"></canvas></div>
+          <hr class="sep">
+          <div class="table-wrap">
+            <table class="data">
+              <thead><tr><th>Rank</th><th>Category</th><th class="num">Tickets</th><th class="num">Share</th><th class="num">Cumulative</th><th>Vital few</th></tr></thead>
+              <tbody>
+                {% for p in pareto %}
+                <tr>
+                  <td>{{ loop.index }}</td>
+                  <td class="t-title">{{ p.category }}</td>
+                  <td class="num">{{ p.count }}</td>
+                  <td class="num">{{ p.pct }}%</td>
+                  <td class="num">{{ p.cum_pct }}%</td>
+                  <td>{{ badge('Vital 20%', 'danger') if p.cum_pct <= 80 else badge('Useful many', 'muted') }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% if vital %}
+          <div class="alert warning" style="margin:1rem 0 0">
+            {{ icon('lightbulb') }}
+            <div><strong>Focus area:</strong> {{ vital|map(attribute='category')|join(', ') }} account for the first ~{{ vital|map(attribute='cum_pct')|list|last }}% of all complaints. Fixing these categories removes most of the workload.</div>
+          </div>
+          {% endif %}
+        {% else %}
+          {{ empty('chart-no-axes-column', 'No complaint data yet', 'Pareto analysis needs complaint records — it builds automatically as students raise tickets.') }}
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="card" data-anim>
+      <div class="card-head">
+        <h3>{{ icon('bug') }} FMEA / defect register</h3>
+        <button class="btn btn-primary btn-sm" data-modal-open="defectModal">{{ icon('plus', 'i-sm') }} Log defect</button>
+      </div>
+      {% if fmea %}
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr><th>Module</th><th>Failure mode</th><th>Category</th><th class="num">S</th><th class="num">O</th><th class="num">D</th><th class="num">RPN</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            {% for d in fmea %}
+            <tr>
+              <td class="t-title">{{ d.module }}</td>
+              <td>{{ d.description }}</td>
+              <td class="tiny">{{ d.category }}</td>
+              <td class="num">{{ d.severity }}</td>
+              <td class="num">{{ d.occurrence }}</td>
+              <td class="num">{{ d.detection }}</td>
+              <td class="num" style="font-weight:800;color:{{ '#dc2626' if d.rpn >= 200 else ('#b45309' if d.rpn >= 100 else '#047857') }}">{{ d.rpn }}</td>
+              <td>{{ status_badge(d.status) }}</td>
+              <td>
+                <form method="post" action="{{ url_for('admin.defect_close', defect_id=d.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="btn btn-ghost btn-sm" type="submit" title="Toggle open/closed">{{ icon('check', 'i-sm') }}</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="card-foot tiny muted">RPN = Severity × Occurrence × Detection (each 1–10). Higher RPN means fix first.</div>
+      {% else %}
+        {{ empty('bug', 'No defects logged', 'Log a known failure mode with S/O/D ratings to compute its Risk Priority Number.') }}
+      {% endif %}
+    </section>
+
+    <section class="card" data-anim>
+      <div class="card-head">
+        <h3>{{ icon('refresh-cw') }} PDCA improvement log</h3>
+        <button class="btn btn-primary btn-sm" data-modal-open="pdcaModal">{{ icon('plus', 'i-sm') }} Add entry</button>
+      </div>
+      <div class="card-body">
+        {% if pdca %}
+        <div class="timeline">
+          {% for p in pdca %}
+          <div class="timeline-item {{ 'ok' if p.phase == 'Act' else ('warn' if p.phase == 'Check' else '') }}">
+            <div class="t-what">{{ badge(p.phase, 'brand') }} {{ p.title }}</div>
+            <div class="tiny muted">{{ p.detail }}</div>
+            <div class="t-when">{{ p.owner }} · {{ p.created_at|date }}</div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+          <p class="tiny muted">No PDCA entries yet. Plan → Do → Check → Act entries keep improvement work traceable.</p>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="card card-pad" data-anim>
+      <h3 style="font-size:.96rem">{{ icon('target') }} Critical to Quality (CTQ)</h3>
+      <p class="tiny muted">Measured from real complaint records — no manual entry.</p>
+      <div class="info-list">
+        <div class="info-row"><span class="k">Tickets logged</span><span class="v">{{ ctq.total }}</span></div>
+        <div class="info-row"><span class="k">Resolved</span><span class="v">{{ ctq.resolved }}</span></div>
+        <div class="info-row"><span class="k">Resolution rate</span><span class="v">{{ ctq.rate }}%</span></div>
+        <div class="info-row"><span class="k">Avg. hours to close</span><span class="v">{{ ctq.avg_hours }}</span></div>
+        <div class="info-row"><span class="k">Closed ≤ 48 h</span><span class="v">{{ ctq.sla }}</span></div>
+        <div class="info-row"><span class="k">Open defects</span><span class="v">{{ ctq.open_defects }}</span></div>
+      </div>
+    </section>
+
+    <section class="card card-pad" data-anim>
+      <h3 style="font-size:.96rem">{{ icon('git-branch') }} Ishikawa (fishbone) categories</h3>
+      <p class="tiny muted">Root-cause buckets used when investigating complaints.</p>
+      <div class="stack-sm">
+        {% for label, cls in [('People — staff availability, training', 'brand'), ('Process — response workflow, hand-offs', 'brand'), ('Software — portal, notifications, data', 'brand'), ('Infrastructure — wiring, plumbing, network', 'brand')] %}
+        <div class="row" style="gap:.5rem;align-items:flex-start">
+          {{ badge(label.split(' — ')[0], cls) }}
+          <span class="tiny muted">{{ label.split(' — ')[1] }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      <hr class="sep">
+      <p class="tiny muted" style="margin:0">Full FMEA matrix, SIPOC map, Pareto and fishbone write-up live in <code>docs/TQM_REPORT.md</code>.</p>
+    </section>
+  </div>
+</div>
+
+<dialog class="modal" id="defectModal">
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="kind" value="defect">
+    <div class="modal-head">
+      <h3>{{ icon('bug') }} Log a defect</h3>
+      <button class="icon-btn" type="button" data-modal-close>{{ icon('x') }}</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="field">
+          <label for="module">Module</label>
+          <input id="module" type="text" name="module" maxlength="60" placeholder="e.g. Room allocation" required>
+        </div>
+        <div class="field">
+          <label for="category">Root-cause category</label>
+          <select id="category" name="category">
+            {% for c in ['People', 'Process', 'Software Code', 'Infrastructure'] %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="field full">
+          <label for="description">Failure mode</label>
+          <input id="description" type="text" name="description" required maxlength="255" placeholder="What went wrong?">
+        </div>
+        <div class="field">
+          <label for="severity">Severity (1–10)</label>
+          <input id="severity" type="number" name="severity" min="1" max="10" value="5">
+        </div>
+        <div class="field">
+          <label for="occurrence">Occurrence (1–10)</label>
+          <input id="occurrence" type="number" name="occurrence" min="1" max="10" value="4">
+        </div>
+        <div class="field">
+          <label for="detection">Detection (1–10)</label>
+          <input id="detection" type="number" name="detection" min="1" max="10" value="4">
+        </div>
+        <div class="field">
+          <label for="logged_on">Logged on</label>
+          <input id="logged_on" type="date" name="logged_on" value="{{ today.isoformat() }}">
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" type="button" data-modal-close>Cancel</button>
+      <button class="btn btn-primary" type="submit">{{ icon('save', 'i-sm') }} Save defect</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="modal" id="pdcaModal">
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="kind" value="pdca">
+    <div class="modal-head">
+      <h3>{{ icon('refresh-cw') }} PDCA entry</h3>
+      <button class="icon-btn" type="button" data-modal-close>{{ icon('x') }}</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="field">
+          <label for="phase">Phase</label>
+          <select id="phase" name="phase">{% for p in ['Plan', 'Do', 'Check', 'Act'] %}<option value="{{ p }}">{{ p }}</option>{% endfor %}</select>
+        </div>
+        <div class="field">
+          <label for="owner">Owner</label>
+          <input id="owner" type="text" name="owner" maxlength="120" value="{{ current_user.name }}">
+        </div>
+        <div class="field full">
+          <label for="title">Title</label>
+          <input id="title" type="text" name="title" required maxlength="150" placeholder="e.g. Auto-close resolved complaints after 7 days">
+        </div>
+        <div class="field full">
+          <label for="detail">Detail</label>
+          <textarea id="detail" name="detail" maxlength="2000" placeholder="What is planned / done / checked / standardised?"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" type="button" data-modal-close>Cancel</button>
+      <button class="btn btn-primary" type="submit">{{ icon('save', 'i-sm') }} Save entry</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}
+
+{% block scripts %}
+{% if pareto %}
+<script>
+  // Classic Pareto on ONE axis: bars = tickets, line = cumulative tickets,
+  // dashed line = the 80% vital-few threshold. No dual-axis ambiguity.
+  var paretoLabels = {{ pareto|map(attribute='category')|list|tojson }};
+  var paretoCounts = {{ pareto|map(attribute='count')|list|tojson }};
+  var paretoCum = {{ pareto|map(attribute='cum_count')|list|tojson }};
+  var paretoPct = {{ pareto|map(attribute='cum_pct')|list|tojson }};
+  var threshold = {{ pareto_threshold }};
+
+  HMS_CHART('paretoChart', {
+    data: {
+      labels: paretoLabels,
+      datasets: [
+        { type: 'bar', label: 'Tickets', data: paretoCounts, backgroundColor: 'rgba(47,75,255,.85)', borderRadius: 8, order: 3 },
+        { type: 'line', label: 'Cumulative tickets', data: paretoCum, borderColor: '#f97316', borderWidth: 2.5,
+          pointRadius: 4, pointBackgroundColor: '#f97316', order: 2 },
+        { type: 'line', label: '80% threshold', data: paretoLabels.map(function () { return threshold; }),
+          borderColor: '#ef4444', borderDash: [6, 5], borderWidth: 1.8, pointRadius: 0, order: 1 }
+      ]
+    },
+    plugins: {
+      legend: { display: true },
+      tooltip: {
+        callbacks: {
+          label: function (ctx) {
+            if (ctx.dataset.label === 'Cumulative tickets') {
+              return 'Cumulative: ' + ctx.parsed.y + ' tickets (' + paretoPct[ctx.dataIndex] + '%)';
+            }
+            return ctx.dataset.label + ': ' + ctx.parsed.y;
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 30, minRotation: 0 } },
+      y: { beginAtZero: true, grid: {}, ticks: { precision: 0, font: { size: 11 } },
+           title: { display: true, text: 'Tickets', font: { size: 10 } } }
+    }
+  });
+</script>
+{% endif %}
+{% endblock %}

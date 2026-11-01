@@ -1,0 +1,106 @@
+{% extends "dashboard_base.html" %}
+{% from 'partials/macros.html' import icon, avatar, badge, status_badge, empty, progress %}
+{% block title %}My Room — {{ hostel_name }}{% endblock %}
+{% block page_title %}My room{% endblock %}
+{% block page_sub %}Allocation details and roommate information{% endblock %}
+
+{% block page_header %}
+<div class="page-head">
+  <div>
+    <div class="breadcrumb"><a href="{{ url_for('student.dashboard') }}">Dashboard</a> {{ icon('chevron-right') }} <span>My room</span></div>
+    <h1>Accommodation</h1>
+    <p>Your current bed, room facilities and allocation history.</p>
+  </div>
+  {% if room %}{{ status_badge(room.live_status) }}{% endif %}
+</div>
+{% endblock %}
+
+{% block page_content %}
+{% if room %}
+<div class="grid-2-1" style="align-items:start">
+  <div class="stack">
+    <section class="card" data-anim>
+      <div class="card-head">
+        <h3>{{ icon('bed-double') }} Room {{ room.room_number }}</h3>
+        <span class="badge brand">{{ room.room_type }}</span>
+      </div>
+      <div class="card-body">
+        <div class="stat-strip">
+          <div class="stat-mini"><div class="l">Room</div><div class="v">{{ room.room_number }}</div></div>
+          <div class="stat-mini"><div class="l">Bed</div><div class="v">{{ allocation.bed_number }} / {{ room.capacity }}</div></div>
+          <div class="stat-mini"><div class="l">Floor</div><div class="v">{{ room.floor }}</div></div>
+          <div class="stat-mini"><div class="l">Block</div><div class="v">{{ room.block or '—' }}</div></div>
+        </div>
+        <div class="info-list" style="margin-top:1.1rem">
+          <div class="info-row"><span class="k">Room type</span><span class="v">{{ room.room_type }}</span></div>
+          <div class="info-row"><span class="k">Capacity</span><span class="v">{{ room.capacity }} residents</span></div>
+          <div class="info-row"><span class="k">Currently occupied</span><span class="v">{{ room.occupied_beds }} of {{ room.capacity }} beds</span></div>
+          <div class="info-row"><span class="k">Semester fee</span><span class="v">₹{{ '{:,.0f}'.format(room.fee_per_semester or 0) }}</span></div>
+          <div class="info-row"><span class="k">Allocated on</span><span class="v">{{ allocation.start_date|date }}</span></div>
+          <div class="info-row"><span class="k">Allocation status</span><span class="v">Active</span></div>
+          {% if room.amenities %}<div class="info-row"><span class="k">Amenities</span><span class="v" style="max-width:60%">{{ room.amenities }}</span></div>{% endif %}
+        </div>
+        <div style="margin-top:1rem">
+          <div class="row-between tiny muted" style="margin-bottom:.35rem"><span>Room occupancy</span><span>{{ room.occupancy_pct }}%</span></div>
+          {{ progress(room.occupancy_pct, 'teal') }}
+        </div>
+      </div>
+    </section>
+
+    <section class="card" data-anim>
+      <div class="card-head"><h3>{{ icon('users-round') }} Roommates</h3><span class="badge muted">{{ roommates|length }}</span></div>
+      {% if roommates %}
+      <div class="card-body occupant-list">
+        {% for mate in roommates %}
+        <div class="occupant">
+          {{ avatar(mate.user, 'sm') }}
+          <div class="o-meta">
+            <div class="o-name">{{ mate.user.name }}</div>
+            <div class="o-sub">{{ mate.enrollment_no }} · {{ mate.course or 'Course not set' }} · {{ mate.year or '' }}</div>
+          </div>
+          <span class="push badge muted">Bed {{ mate.active_allocation.bed_number }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+        {{ empty('users', 'No roommates', 'You are the only resident allocated to this room right now.') }}
+      {% endif %}
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="card card-pad" data-anim>
+      <h3 style="font-size:.98rem">{{ icon('info') }} Need a change?</h3>
+      <p class="tiny muted">Room changes are approved by the warden. Raise a request with your reason and the office will review availability.</p>
+      <a class="btn btn-primary btn-block" href="{{ url_for('student.complaints') }}">{{ icon('message-square-warning') }} Request room change</a>
+      <a class="btn btn-outline btn-block" style="margin-top:.5rem" href="{{ url_for('student.contact') }}">{{ icon('mail') }} Message the office</a>
+    </section>
+
+    <section class="card" data-anim>
+      <div class="card-head"><h3>{{ icon('history') }} Allocation history</h3></div>
+      <div class="card-body">
+        {% if history %}
+        <div class="timeline">
+          {% for a in history %}
+          <div class="timeline-item {{ 'ok' if a.is_active else '' }}">
+            <div class="t-what">Room {{ a.room.room_number }} · Bed {{ a.bed_number }}</div>
+            <div class="tiny muted">{{ a.room.room_type }} · Floor {{ a.room.floor }}</div>
+            <div class="t-when">{{ a.start_date|date }} → {{ a.end_date|date if a.end_date else 'present' }}</div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+          <p class="tiny muted">No allocation history.</p>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+</div>
+{% else %}
+<section class="card" data-anim>
+  {{ empty('bed-single', 'No room allocated yet',
+           'The warden allocates beds from the Room Allocation screen. As soon as your bed is assigned, this page shows the room number, bed and roommates.',
+           url_for('student.contact'), 'Contact the office') }}
+</section>
+{% endif %}
+{% endblock %}

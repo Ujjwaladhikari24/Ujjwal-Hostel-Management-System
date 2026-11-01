@@ -1,0 +1,229 @@
+{% extends "dashboard_base.html" %}
+{% from 'partials/macros.html' import icon, avatar, status_badge, badge, kpi, progress, empty %}
+
+{% block title %}My Dashboard — {{ hostel_name }}{% endblock %}
+{% block page_title %}Student dashboard{% endblock %}
+{% block page_sub %}{{ student.enrollment_no }} &middot; {{ student.course or 'Course not set' }}{% endblock %}
+
+{% block page_header %}
+<section class="profile-hero" data-anim>
+  {{ avatar(student.user, 'lg') }}
+  <div style="flex:1;min-width:220px">
+    <div class="row" style="gap:.5rem;flex-wrap:wrap">
+      <span class="badge" style="background:rgba(255,255,255,.16);color:#fff">{{ academic_session }}</span>
+      <span class="badge" style="background:rgba(255,255,255,.16);color:#fff">{{ student.year or 'Year not set' }}</span>
+      {{ badge('Active' if student.status == 'Active' else 'Inactive', 'ok' if student.status == 'Active' else 'danger', true) }}
+    </div>
+    <div class="p-name" style="margin-top:.45rem">Hello, {{ student.user.name.split(' ')[0] }} 👋</div>
+    <div class="p-meta">
+      <span>{{ icon('hash', 'i-sm') }} {{ student.enrollment_no }}</span>
+      <span>{{ icon('graduation-cap', 'i-sm') }} {{ student.course or '—' }}{% if student.department %} · {{ student.department }}{% endif %}</span>
+      <span>{{ icon('bed-double', 'i-sm') }} {{ ('Room ' ~ room.room_number) if room else 'Room not allocated yet' }}</span>
+    </div>
+  </div>
+  <div class="row wrap" style="gap:.5rem">
+    <a class="btn btn-white btn-sm" href="{{ url_for('student.my_room') }}">{{ icon('bed-double', 'i-sm') }} My room</a>
+    <a class="btn btn-sm" style="background:rgba(255,255,255,.16);color:#fff" href="{{ url_for('student.complaints') }}">{{ icon('plus', 'i-sm') }} New complaint</a>
+  </div>
+</section>
+{% endblock %}
+
+{% block page_content %}
+<div class="kpi-grid">
+  {{ kpi('brand', 'bed-double', 'Room status', (room.room_number if room else '—'),
+         ('Bed ' ~ allocation.bed_number ~ ' · ' ~ room.room_type) if room else 'Awaiting allocation') }}
+  {{ kpi('teal', 'wallet', 'Fee balance', '₹' ~ '{:,.0f}'.format(stats.balance),
+         ('Total billed ₹' ~ '{:,.0f}'.format(stats.total_billed)) ) }}
+  {{ kpi('orange', 'message-square-warning', 'Open complaints', stats.open_complaints,
+         (stats.resolved_complaints ~ ' resolved so far')) }}
+  {% set due_date = stats.next_due.due_date if stats.next_due else none %}
+  {% set overdue = due_date and due_date < today %}
+  {{ kpi('sunset', 'calendar-clock', 'Overdue since' if overdue else 'Next due',
+         (due_date|date if due_date else 'None'),
+         (('₹' ~ '{:,.0f}'.format(stats.next_due.balance) ~ ' outstanding') if stats.next_due else 'No pending invoices')) }}
+</div>
+
+<div class="grid-2-1">
+  <!-- -------------------------------- left column -->
+  <div class="stack">
+    <section class="card" data-anim>
+      <div class="card-head">
+        <h3>{{ icon('receipt-indian-rupee') }} Fee summary</h3>
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('student.fees') }}">View details {{ icon('arrow-right', 'i-sm') }}</a>
+      </div>
+      <div class="card-body">
+        <div class="row-between" style="margin-bottom:.5rem">
+          <span class="tiny muted">Paid ₹{{ '{:,.0f}'.format(stats.total_paid) }} of ₹{{ '{:,.0f}'.format(stats.total_billed) }}</span>
+          <span class="tiny" style="font-weight:700">{{ (stats.total_paid * 100 / stats.total_billed)|round|int if stats.total_billed else 0 }}%</span>
+        </div>
+        {{ progress((stats.total_paid * 100 / stats.total_billed) if stats.total_billed else 0, 'teal') }}
+        <div class="stat-strip" style="margin-top:1.1rem">
+          <div class="stat-mini"><div class="l">Billed</div><div class="v">₹{{ '{:,.0f}'.format(stats.total_billed) }}</div></div>
+          <div class="stat-mini"><div class="l">Paid</div><div class="v" style="color:#047857">₹{{ '{:,.0f}'.format(stats.total_paid) }}</div></div>
+          <div class="stat-mini"><div class="l">Balance</div><div class="v" style="color:{{ '#dc2626' if stats.balance > 0 else '#047857' }}">₹{{ '{:,.0f}'.format(stats.balance) }}</div></div>
+          <div class="stat-mini"><div class="l">Overdue</div><div class="v">{{ stats.overdue_count }}</div></div>
+        </div>
+        {% if fee_rows %}
+        <div class="table-wrap" style="margin-top:1rem">
+          <table class="data">
+            <thead><tr><th>Fee head</th><th>Due date</th><th class="num">Amount</th><th>Status</th></tr></thead>
+            <tbody>
+              {% for f in fee_rows %}
+              <tr>
+                <td class="t-title">{{ f.title }}<div class="t-sub">{{ f.semester or '' }}</div></td>
+                <td>{{ f.due_date|date }}</td>
+                <td class="num">₹{{ '{:,.0f}'.format(f.amount) }}</td>
+                <td>{{ status_badge(f.status) }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+          {{ empty('receipt', 'No fee records yet', 'The hostel office has not assigned any fee to your account.') }}
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="card" data-anim>
+      <div class="card-head">
+        <h3>{{ icon('bed-double') }} My accommodation</h3>
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('student.my_room') }}">Open {{ icon('arrow-right', 'i-sm') }}</a>
+      </div>
+      {% if room %}
+      <div class="card-body grid-2" style="gap:1rem">
+        <div class="info-list">
+          <div class="info-row"><span class="k">Room number</span><span class="v">{{ room.room_number }}</span></div>
+          <div class="info-row"><span class="k">Room type</span><span class="v">{{ room.room_type }}</span></div>
+          <div class="info-row"><span class="k">Floor / block</span><span class="v">Floor {{ room.floor }}{% if room.block %} · {{ room.block }}{% endif %}</span></div>
+          <div class="info-row"><span class="k">Bed number</span><span class="v">Bed {{ allocation.bed_number }} of {{ room.capacity }}</span></div>
+          <div class="info-row"><span class="k">Allocated on</span><span class="v">{{ allocation.start_date|date }}</span></div>
+        </div>
+        <div>
+          <div class="tiny muted" style="margin-bottom:.4rem">Roommates</div>
+          {% if student.roommates %}
+            <div class="occupant-list">
+              {% for mate in student.roommates %}
+              <div class="occupant">
+                {{ avatar(mate.user, 'sm') }}
+                <div class="o-meta">
+                  <div class="o-name">{{ mate.user.name }}</div>
+                  <div class="o-sub">{{ mate.enrollment_no }}</div>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="tiny muted">You are currently the only resident in this room.</p>
+          {% endif %}
+        </div>
+      </div>
+      {% else %}
+        {{ empty('bed-single', 'No room allocated yet',
+                'The warden allocates beds based on availability. You will get an in-app notification the moment a room is assigned.',
+                url_for('student.my_room'), 'View room page') }}
+      {% endif %}
+    </section>
+
+    <section class="card" data-anim>
+      <div class="card-head">
+        <h3>{{ icon('message-square-warning') }} Recent complaints</h3>
+        <a class="btn btn-primary btn-sm" href="{{ url_for('student.complaints') }}">{{ icon('plus', 'i-sm') }} Submit complaint</a>
+      </div>
+      {% if recent_complaints %}
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr><th>Ticket</th><th>Subject</th><th>Category</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            {% for c in recent_complaints %}
+            <tr>
+              <td class="mono tiny">{{ c.ticket_no }}</td>
+              <td class="t-title">{{ c.subject }}<div class="t-sub">{{ c.created_at|ago }}</div></td>
+              <td>{{ c.category }}</td>
+              <td>{{ status_badge(c.status) }}</td>
+              <td class="right"><a class="btn btn-ghost btn-sm" href="{{ url_for('student.complaint_detail', complaint_id=c.id) }}">Open</a></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        {{ empty('inbox', 'No complaints raised', 'Something not working in your room? Raise a ticket and track it to resolution.') }}
+      {% endif %}
+    </section>
+  </div>
+
+  <!-- -------------------------------- right column -->
+  <div class="stack">
+    <section class="card" data-anim>
+      <div class="card-head">
+        <h3>{{ icon('megaphone') }} Announcements</h3>
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('student.announcements') }}">All</a>
+      </div>
+      <div class="card-body stack-sm">
+        {% for a in announcements %}
+        <article style="border-left:3px solid var(--indigo);padding-left:.75rem">
+          <div class="row-between">
+            <span class="tiny" style="color:var(--indigo);font-weight:700;text-transform:uppercase;letter-spacing:.06em">{{ a.tag }}</span>
+            <span class="tiny muted">{{ a.created_at|ago }}</span>
+          </div>
+          <div style="font-weight:650;font-size:.88rem">{{ a.title }}</div>
+          <div class="tiny muted">{{ a.body|truncate(90) }}</div>
+        </article>
+        {% else %}
+          <div class="empty" style="padding:1.4rem .5rem">
+            <div class="empty-icon" style="width:48px;height:48px;border-radius:15px">{{ icon('megaphone') }}</div>
+            <h4 style="font-size:.9rem">No announcements</h4>
+            <p class="tiny">Hostel notices will appear here.</p>
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="card" data-anim>
+      <div class="card-head"><h3>{{ icon('zap') }} Quick actions</h3></div>
+      <div class="card-body stack-sm">
+        <a class="tile-link" href="{{ url_for('student.profile') }}">
+          <span class="tl-icon" style="background:var(--grad-brand)">{{ icon('user-round') }}</span>
+          <span><span class="tl-title">Edit profile</span><br><span class="tl-sub">Phone, guardian, photo</span></span>
+        </a>
+        <a class="tile-link" href="{{ url_for('student.payments') }}">
+          <span class="tl-icon" style="background:var(--grad-teal)">{{ icon('history') }}</span>
+          <span><span class="tl-title">Payment history</span><br><span class="tl-sub">{{ stats.payments_count }} receipt(s) available</span></span>
+        </a>
+        <a class="tile-link" href="{{ url_for('student.announcements') }}">
+          <span class="tl-icon" style="background:var(--grad-orange)">{{ icon('megaphone') }}</span>
+          <span><span class="tl-title">Notice board</span><br><span class="tl-sub">Hostel updates &amp; mess menu</span></span>
+        </a>
+        <a class="tile-link" href="{{ url_for('student.rules') }}">
+          <span class="tl-icon" style="background:linear-gradient(135deg,#7c3aed,#ec4899)">{{ icon('book-open-check') }}</span>
+          <span><span class="tl-title">Hostel rules</span><br><span class="tl-sub">Timings, visitors, safety</span></span>
+        </a>
+        <a class="tile-link" href="{{ url_for('student.contact') }}">
+          <span class="tl-icon" style="background:linear-gradient(135deg,#0ea5e9,#06b6d4)">{{ icon('mail') }}</span>
+          <span><span class="tl-title">Contact administration</span><br><span class="tl-sub">Message the office</span></span>
+        </a>
+      </div>
+    </section>
+
+    {% if recent_payments %}
+    <section class="card" data-anim>
+      <div class="card-head"><h3>{{ icon('badge-check') }} Latest receipts</h3></div>
+      <div class="card-body stack-sm">
+        {% for p in recent_payments %}
+        <div class="row-between" style="font-size:.85rem">
+          <span>
+            <strong>₹{{ '{:,.0f}'.format(p.amount) }}</strong>
+            <span class="tiny muted"> · {{ p.method }}</span><br>
+            <span class="tiny muted">{{ p.paid_on|date }} · {{ p.receipt_no }}</span>
+          </span>
+          <a class="btn btn-ghost btn-sm" href="{{ url_for('student.receipt', payment_id=p.id) }}">{{ icon('file-text', 'i-sm') }} Receipt</a>
+        </div>
+        {% if not loop.last %}<hr class="sep" style="margin:.2rem 0">{% endif %}
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

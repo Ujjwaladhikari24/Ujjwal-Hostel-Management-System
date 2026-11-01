@@ -1,0 +1,133 @@
+{% extends "dashboard_base.html" %}
+{% from 'partials/macros.html' import icon, badge, status_badge, empty, avatar %}
+{% block title %}Room Management — {{ hostel_name }}{% endblock %}
+{% block page_title %}Room management{% endblock %}
+{% block page_sub %}{{ summary.rooms }} room(s) · {{ summary.occupied }} of {{ summary.beds }} beds occupied{% endblock %}
+
+{% block page_header %}
+<div class="page-head">
+  <div>
+    <div class="breadcrumb"><a href="{{ url_for('admin.overview') }}">Overview</a> {{ icon('chevron-right') }} <span>Rooms</span></div>
+    <h1>Rooms &amp; beds</h1>
+    <p>Inventory, capacity and live occupancy status for every room.</p>
+  </div>
+  <div class="page-actions">
+    <a class="btn btn-outline" href="{{ url_for('admin.export_csv', kind='rooms') }}">{{ icon('download') }} Export CSV</a>
+    <a class="btn btn-primary" href="{{ url_for('admin.room_new') }}">{{ icon('plus') }} Add room</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_content %}
+<div class="stat-strip" data-anim>
+  <div class="stat-mini"><div class="l">Rooms</div><div class="v">{{ summary.rooms }}</div></div>
+  <div class="stat-mini"><div class="l">Total beds</div><div class="v">{{ summary.beds }}</div></div>
+  <div class="stat-mini"><div class="l">Occupied</div><div class="v" style="color:#0369a1">{{ summary.occupied }}</div></div>
+  <div class="stat-mini"><div class="l">Free beds</div><div class="v" style="color:#047857">{{ summary.free }}</div></div>
+  <div class="stat-mini"><div class="l">Empty rooms</div><div class="v">{{ summary.available }}</div></div>
+  <div class="stat-mini"><div class="l">Maintenance</div><div class="v" style="color:#b91c1c">{{ summary.maintenance }}</div></div>
+</div>
+
+<section class="card" data-anim>
+  <div class="card-head">
+    <h3>{{ icon('filter') }} Filters</h3>
+    <form class="filters" method="get" action="{{ url_for('admin.rooms') }}" data-autosubmit>
+      <input class="grow" type="search" name="q" value="{{ q }}" placeholder="Room number or block…" aria-label="Search rooms">
+      <select name="type" aria-label="Room type">
+        <option value="">All types</option>
+        {% for t in room_types %}<option value="{{ t }}" {{ 'selected' if rtype == t }}>{{ t }}</option>{% endfor %}
+      </select>
+      <select name="status" aria-label="Status">
+        <option value="">Any status</option>
+        {% for s in ['Available', 'Partially Occupied', 'Full', 'Maintenance'] %}
+          <option value="{{ s }}" {{ 'selected' if status == s }}>{{ s }}</option>
+        {% endfor %}
+      </select>
+      <select name="floor" aria-label="Floor">
+        <option value="">All floors</option>
+        {% for f in floors %}<option value="{{ f }}" {{ 'selected' if floor == f|string }}>Floor {{ f }}</option>{% endfor %}
+      </select>
+      <button class="btn btn-outline btn-sm" type="submit">{{ icon('search', 'i-sm') }} Apply</button>
+      {% if q or rtype or status or floor %}<a class="btn btn-ghost btn-sm" href="{{ url_for('admin.rooms') }}">Reset</a>{% endif %}
+    </form>
+  </div>
+  <div class="card-body">
+    <div class="row wrap" style="gap:.45rem">
+      <span class="chip"><i style="width:8px;height:8px;border-radius:50%;background:#10b981;display:inline-block"></i> Available {{ summary.available }}</span>
+      <span class="chip"><i style="width:8px;height:8px;border-radius:50%;background:#f59e0b;display:inline-block"></i> Partially occupied {{ summary.partial }}</span>
+      <span class="chip"><i style="width:8px;height:8px;border-radius:50%;background:#2f4bff;display:inline-block"></i> Full {{ summary.full }}</span>
+      <span class="chip"><i style="width:8px;height:8px;border-radius:50%;background:#ef4444;display:inline-block"></i> Maintenance {{ summary.maintenance }}</span>
+    </div>
+  </div>
+</section>
+
+{% if rows %}
+<div class="room-grid">
+  {% for r in rows %}
+  {% set st = r.live_status %}
+  <article class="room-card st-{{ 'available' if st == 'Available' else 'partial' if st == 'Partially Occupied' else 'full' if st == 'Full' else 'maintenance' if st == 'Maintenance' else 'archived' }}" data-anim>
+    <div class="rc-top"></div>
+    <div class="rc-body">
+      <div class="row-between">
+        <div class="rc-no">{{ icon('door-open', 'i-lg') }} {{ r.room_number }}</div>
+        {{ status_badge(st) }}
+      </div>
+      <div class="rc-meta">
+        <span>{{ icon('layers', 'i-sm') }} {{ r.room_type }}</span>
+        <span>{{ icon('arrow-up-to-line', 'i-sm') }} Floor {{ r.floor }}</span>
+        {% if r.block %}<span>{{ icon('building', 'i-sm') }} {{ r.block }}</span>{% endif %}
+      </div>
+      <div class="row-between" style="font-size:.8rem">
+        <span class="muted">Occupancy</span>
+        <strong>{{ r.occupied_beds }} / {{ r.capacity }}</strong>
+      </div>
+      <div class="progress {{ 'green' if r.free_beds else '' }}"><span style="width: {{ r.occupancy_pct }}%"></span></div>
+      <div class="bed-pills">
+        {% for n in range(1, r.capacity + 1) %}
+          <span class="bed-pill {{ '' if n in r.free_bed_numbers else 'taken' }}">B{{ n }}</span>
+        {% endfor %}
+      </div>
+      <div class="row-between tiny muted">
+        <span>₹{{ '{:,.0f}'.format(r.fee_per_semester or 0) }} / semester</span>
+        <span>{{ r.free_beds }} free</span>
+      </div>
+      {% if r.active_allocations %}
+      <div class="occupant-list">
+        {% for a in r.active_allocations[:3] %}
+        <div class="occupant">
+          {{ avatar(a.student.user, 'sm') }}
+          <div class="o-meta">
+            <div class="o-name">{{ a.student.user.name }}</div>
+            <div class="o-sub">Bed {{ a.bed_number }} · {{ a.student.enrollment_no }}</div>
+          </div>
+        </div>
+        {% endfor %}
+        {% if r.active_allocations|length > 3 %}<div class="tiny muted">+ {{ r.active_allocations|length - 3 }} more…</div>{% endif %}
+      </div>
+      {% endif %}
+    </div>
+    <div class="rc-foot">
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.room_edit', room_id=r.id) }}">{{ icon('pencil', 'i-sm') }} Edit</a>
+      <div class="row" style="gap:.3rem">
+        <form method="post" action="{{ url_for('admin.room_status', room_id=r.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="status" value="{{ 'Available' if r.status == 'Maintenance' else 'Maintenance' }}">
+          <button class="btn btn-ghost btn-sm" type="submit" title="{{ 'Mark available' if r.status == 'Maintenance' else 'Mark maintenance' }}">
+            {{ icon('wrench' if r.status != 'Maintenance' else 'check', 'i-sm') }}
+          </button>
+        </form>
+        <form method="post" action="{{ url_for('admin.room_delete', room_id=r.id) }}" data-confirm="Archive room {{ r.room_number }}? Its history is preserved.">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-ghost btn-sm" type="submit" title="Archive room" {{ 'disabled' if r.occupied_beds }}>{{ icon('archive', 'i-sm') }}</button>
+        </form>
+      </div>
+    </div>
+  </article>
+  {% endfor %}
+</div>
+{% else %}
+<section class="card">
+  {{ empty('building-2', 'No rooms match', 'Add rooms to the hostel inventory, or reset the filters to see everything.', url_for('admin.room_new'), 'Add room') }}
+</section>
+{% endif %}
+{% endblock %}

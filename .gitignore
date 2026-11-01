@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Environment & secrets
+.env
+*.env
+!.env.example
+
+# Database
+instance/
+*.sqlite3
+*.db
+
+# Uploaded files (keep the folders, drop the contents)
+hms/static/uploads/photos/*
+hms/static/uploads/complaints/*
+!hms/static/uploads/photos/.gitkeep
+!hms/static/uploads/complaints/.gitkeep
+
+# Tooling / OS
+.pytest_cache/
+.idea/
+.vscode/
+.DS_Store
+shots/

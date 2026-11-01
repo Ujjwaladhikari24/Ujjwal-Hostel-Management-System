@@ -1,0 +1,158 @@
+{% extends "dashboard_base.html" %}
+{% from 'partials/macros.html' import icon, avatar %}
+{% set editing = student is defined and student %}
+{% block title %}{{ 'Edit' if editing else 'Add' }} Student — {{ hostel_name }}{% endblock %}
+{% block page_title %}{{ 'Edit student' if editing else 'Add student' }}{% endblock %}
+{% block page_sub %}{{ student.user.name if editing else 'Create a resident account' }}{% endblock %}
+
+{% block page_header %}
+<div class="page-head">
+  <div>
+    <div class="breadcrumb"><a href="{{ url_for('admin.students') }}">Students</a> {{ icon('chevron-right') }} <span>{{ 'Edit' if editing else 'New' }}</span></div>
+    <h1>{{ 'Edit student record' if editing else 'Add a new student' }}</h1>
+    <p>{{ 'Update details, status and account access.' if editing else 'The student can sign in immediately with the password you set.' }}</p>
+  </div>
+  <div class="page-actions">
+    <a class="btn btn-ghost" href="{{ url_for('admin.students') }}">{{ icon('arrow-left') }} Back to list</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_content %}
+<form method="post" action="{{ url_for('admin.student_edit', student_id=student.id) if editing else url_for('admin.student_new') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="grid-2-1" style="align-items:start">
+    <div class="stack">
+      <section class="card">
+        <div class="card-head"><h3>{{ icon('user-round') }} Personal details</h3></div>
+        <div class="card-body">
+          <div class="form-grid">
+            <div class="field full">
+              <label for="name">Full name <span class="req">*</span></label>
+              <input id="name" type="text" name="name" value="{{ form.get('name','') }}" required minlength="3" maxlength="120">
+            </div>
+            <div class="field">
+              <label for="email">Email <span class="req">*</span></label>
+              <input id="email" type="email" name="email" value="{{ form.get('email','') }}" required maxlength="190">
+            </div>
+            <div class="field">
+              <label for="phone">Phone <span class="req">*</span></label>
+              <input id="phone" type="tel" name="phone" value="{{ form.get('phone','') }}" required maxlength="20">
+            </div>
+            <div class="field">
+              <label for="enrollment_no">Enrollment number <span class="req">*</span></label>
+              <input id="enrollment_no" type="text" name="enrollment_no" value="{{ form.get('enrollment_no','') }}" required maxlength="40">
+            </div>
+            <div class="field">
+              <label for="course">Course</label>
+              <select id="course" name="course">
+                <option value="">Select course</option>
+                {% for c in ['B.Tech', 'B.Sc', 'B.Com', 'BBA', 'B.Arch', 'M.Tech', 'MBA', 'MCA', 'PhD', 'Other'] %}
+                  <option value="{{ c }}" {{ 'selected' if form.get('course') == c }}>{{ c }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="field">
+              <label for="department">Department</label>
+              <input id="department" type="text" name="department" value="{{ form.get('department','') }}" maxlength="80">
+            </div>
+            <div class="field">
+              <label for="year">Year / semester</label>
+              <select id="year" name="year">
+                <option value="">Select year</option>
+                {% for y in ['1st Year', '2nd Year', '3rd Year', '4th Year', '5th Year', 'Postgraduate', 'Other'] %}
+                  <option value="{{ y }}" {{ 'selected' if form.get('year') == y }}>{{ y }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="field">
+              <label for="guardian_name">Guardian name</label>
+              <input id="guardian_name" type="text" name="guardian_name" value="{{ form.get('guardian_name','') }}" maxlength="120">
+            </div>
+            <div class="field">
+              <label for="guardian_phone">Guardian phone</label>
+              <input id="guardian_phone" type="tel" name="guardian_phone" value="{{ form.get('guardian_phone','') }}" maxlength="20">
+            </div>
+            <div class="field full">
+              <label for="address">Address</label>
+              <input id="address" type="text" name="address" value="{{ form.get('address','') }}" maxlength="255">
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {% if not editing %}
+      <section class="card">
+        <div class="card-head"><h3>{{ icon('bed-double') }} Room allocation <span class="badge muted">optional</span></h3></div>
+        <div class="card-body">
+          <div class="form-grid">
+            <div class="field">
+              <label for="room_id">Assign a room</label>
+              <select id="room_id" name="room_id">
+                <option value="">Do not allocate now</option>
+                {% if rooms %}
+                  {% for r in rooms %}
+                  <option value="{{ r.id }}">Room {{ r.room_number }} · {{ r.room_type }} · {{ r.free_beds }} bed(s) free</option>
+                  {% endfor %}
+                {% endif %}
+              </select>
+              <span class="hint">
+                {% if rooms %}Only rooms with free beds are listed — over-allocation is blocked.{% else %}No rooms with free beds right now. Add rooms first from Room Management.{% endif %}
+              </span>
+            </div>
+            <div class="field">
+              <label for="bed_number">Preferred bed number</label>
+              <input id="bed_number" type="number" name="bed_number" min="1" max="8" placeholder="Auto-assign if blank">
+            </div>
+          </div>
+        </div>
+      </section>
+      {% endif %}
+    </div>
+
+    <div class="stack">
+      <section class="card">
+        <div class="card-head"><h3>{{ icon('shield-check') }} Account access</h3></div>
+        <div class="card-body">
+          {% if editing %}
+            <div class="row" style="gap:.8rem;margin-bottom:1rem">
+              {{ avatar(student.user) }}
+              <div>
+                <div style="font-weight:700">{{ student.user.name }}</div>
+                <div class="tiny muted">{{ student.user.email }}</div>
+              </div>
+            </div>
+            <div class="field">
+              <label for="status">Hostel status</label>
+              <select id="status" name="status">
+                <option value="Active" {{ 'selected' if form.get('status') == 'Active' }}>Active resident</option>
+                <option value="Inactive" {{ 'selected' if form.get('status') == 'Inactive' }}>Inactive</option>
+              </select>
+            </div>
+            <label class="check" style="margin-bottom:1rem">
+              <input type="checkbox" name="toggle_account" value="1" {{ 'checked' if not student.user.is_active }}>
+              Block sign-in for this account
+            </label>
+            <a class="btn btn-outline btn-block btn-sm" href="{{ url_for('admin.student_detail', student_id=student.id) }}">{{ icon('key-round', 'i-sm') }} Reset password from profile</a>
+          {% else %}
+            <div class="field">
+              <label for="password">Initial password <span class="req">*</span></label>
+              <input id="password" type="password" name="password" minlength="8" autocomplete="new-password" placeholder="Leave blank for Hostel@123">
+              <span class="hint">Minimum 8 characters with letters and numbers.</span>
+            </div>
+            <div class="alert info" style="margin-bottom:0">
+              {{ icon('info') }}
+              <div>The student signs in at the student login with this email and password, and can change it later.</div>
+            </div>
+          {% endif %}
+        </div>
+      </section>
+
+      <section class="card card-pad">
+        <button class="btn btn-primary btn-block" type="submit">{{ icon('save') }} {{ 'Save changes' if editing else 'Create student' }}</button>
+        <a class="btn btn-ghost btn-block" style="margin-top:.5rem" href="{{ url_for('admin.students') }}">Cancel</a>
+      </section>
+    </div>
+  </div>
+</form>
+{% endblock %}

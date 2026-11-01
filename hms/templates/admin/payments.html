@@ -1,0 +1,149 @@
+{% extends "dashboard_base.html" %}
+{% from 'partials/macros.html' import icon, avatar, badge, empty, pager %}
+{% block title %}Payment Records — {{ hostel_name }}{% endblock %}
+{% block page_title %}Payment records{% endblock %}
+{% block page_sub %}₹{{ '{:,.0f}'.format(total) }} across {{ page.total }} record(s){% endblock %}
+
+{% block page_header %}
+<div class="page-head">
+  <div>
+    <div class="breadcrumb"><a href="{{ url_for('admin.overview') }}">Overview</a> {{ icon('chevron-right') }} <span>Payments</span></div>
+    <h1>Payments &amp; receipts</h1>
+    <p>Every row here was entered by hostel staff — no online gateway is connected.</p>
+  </div>
+  <div class="page-actions">
+    <a class="btn btn-outline" href="{{ url_for('admin.export_csv', kind='payments') }}">{{ icon('download') }} Export CSV</a>
+    <button class="btn btn-primary" data-modal-open="payModal">{{ icon('plus') }} Record payment</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_content %}
+<div class="grid-2" style="align-items:start">
+  <div class="stat-strip">
+    <div class="stat-mini"><div class="l">Total received</div><div class="v" style="color:#047857">₹{{ '{:,.0f}'.format(total) }}</div></div>
+    <div class="stat-mini"><div class="l">Receipts (filtered)</div><div class="v">{{ page.total }}</div></div>
+  </div>
+  <div class="stat-strip">
+    {% for m, amt in by_method.items() %}
+    <div class="stat-mini"><div class="l">{{ m }}</div><div class="v">₹{{ '{:,.0f}'.format(amt) }}</div></div>
+    {% endfor %}
+  </div>
+</div>
+
+<section class="card" data-anim>
+  <div class="card-head">
+    <h3>{{ icon('wallet-cards') }} Payment log</h3>
+    <form class="filters" method="get" action="{{ url_for('admin.payments') }}">
+      <input class="grow" type="search" name="q" value="{{ q }}" placeholder="Student, receipt, reference…" aria-label="Search payments">
+      <select name="method" aria-label="Method">
+        <option value="">All methods</option>
+        {% for m in methods %}<option value="{{ m }}" {{ 'selected' if method == m }}>{{ m }}</option>{% endfor %}
+      </select>
+      <input type="date" name="start" value="{{ start }}" aria-label="From date">
+      <input type="date" name="end" value="{{ end }}" aria-label="To date">
+      <button class="btn btn-outline btn-sm" type="submit">{{ icon('filter', 'i-sm') }} Filter</button>
+      {% if q or method or start or end %}<a class="btn btn-ghost btn-sm" href="{{ url_for('admin.payments') }}">Reset</a>{% endif %}
+    </form>
+  </div>
+
+  {% if rows %}
+  <div class="table-wrap">
+    <table class="data">
+      <thead>
+        <tr><th>Receipt</th><th>Student</th><th>Fee head</th><th>Method</th><th>Date</th>
+            <th class="num">Amount</th><th>Recorded by</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for p in rows %}
+        <tr>
+          <td class="mono tiny">{{ p.receipt_no }}</td>
+          <td>
+            <div class="row">
+              {{ avatar(p.student.user, 'sm') }}
+              <div>
+                <div class="t-title">{{ p.student.user.name }}</div>
+                <div class="t-sub">{{ p.student.enrollment_no }}</div>
+              </div>
+            </div>
+          </td>
+          <td class="tiny">{{ p.fee_record.title if p.fee_record else 'General payment' }}
+            {% if p.reference %}<div class="t-sub">Ref {{ p.reference }}</div>{% endif %}
+          </td>
+          <td>{{ badge(p.method, 'brand') }}</td>
+          <td class="tiny">{{ p.paid_on|date }}</td>
+          <td class="num" style="font-weight:700">₹{{ '{:,.0f}'.format(p.amount) }}</td>
+          <td class="tiny muted">{{ p.recorder.name if p.recorder else '—' }}</td>
+          <td>
+            <div class="table-actions">
+              <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.payment_receipt', payment_id=p.id) }}" title="Receipt">{{ icon('file-text', 'i-sm') }}</a>
+              <form method="post" action="{{ url_for('admin.payment_delete', payment_id=p.id) }}" data-confirm="Delete receipt {{ p.receipt_no }}? The student's balance will change.">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-ghost btn-sm" type="submit" title="Delete">{{ icon('trash-2', 'i-sm') }}</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {{ pager(page) }}
+  {% else %}
+    {{ empty('wallet', 'No payments recorded', 'Record a payment when a student pays at the hostel office.') }}
+  {% endif %}
+</section>
+
+<dialog class="modal" id="payModal">
+  <form method="post" action="{{ url_for('admin.payment_new') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="modal-head">
+      <h3>{{ icon('wallet') }} Record a payment</h3>
+      <button class="icon-btn" type="button" data-modal-close>{{ icon('x') }}</button>
+    </div>
+    <div class="modal-body">
+      <div class="alert info">
+        {{ icon('info') }}
+        <div>Enter the amount actually received at the counter. A receipt number is generated automatically.</div>
+      </div>
+      <div class="form-grid">
+        <div class="field full">
+          <label for="student_id">Student <span class="req">*</span></label>
+          <select id="student_id" name="student_id" required>
+            <option value="">Select student…</option>
+            {% for s in students %}
+            <option value="{{ s.id }}">{{ s.user.name }} · {{ s.enrollment_no }} · balance ₹{{ '{:,.0f}'.format(s.balance) }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="amount">Amount (₹) <span class="req">*</span></label>
+          <input id="amount" type="number" name="amount" min="1" step="0.01" required>
+        </div>
+        <div class="field">
+          <label for="method">Method</label>
+          <select id="method" name="method">
+            {% for m in methods %}<option value="{{ m }}">{{ m }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="paid_on">Payment date</label>
+          <input id="paid_on" type="date" name="paid_on" value="{{ today.isoformat() }}" required>
+        </div>
+        <div class="field">
+          <label for="reference">Reference</label>
+          <input id="reference" type="text" name="reference" maxlength="80" placeholder="UPI / cheque no.">
+        </div>
+        <div class="field full">
+          <label for="note">Note</label>
+          <input id="note" type="text" name="note" maxlength="255" placeholder="Optional remark">
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" type="button" data-modal-close>Cancel</button>
+      <button class="btn btn-teal" type="submit">{{ icon('badge-check', 'i-sm') }} Record payment</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}

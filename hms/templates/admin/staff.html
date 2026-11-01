@@ -1,0 +1,143 @@
+{% extends "dashboard_base.html" %}
+{% from 'partials/macros.html' import icon, status_badge, badge, empty %}
+{% block title %}Hostel Staff — {{ hostel_name }}{% endblock %}
+{% block page_title %}Hostel staff{% endblock %}
+{% block page_sub %}{{ rows|length }} member(s) in the filtered list{% endblock %}
+
+{% block page_header %}
+<div class="page-head">
+  <div>
+    <div class="breadcrumb"><a href="{{ url_for('admin.overview') }}">Overview</a> {{ icon('chevron-right') }} <span>Staff</span></div>
+    <h1>Staff directory</h1>
+    <p>Wardens, security, housekeeping, maintenance and mess personnel.</p>
+  </div>
+  <div class="page-actions"><button class="btn btn-primary" data-modal-open="staffModal">{{ icon('user-plus') }} Add staff</button></div>
+</div>
+{% endblock %}
+
+{% block page_content %}
+<div class="row wrap" style="gap:.4rem">
+  {% for role in roles %}
+    <a class="chip {{ 'active' if request.args.get('role') == role }}" href="{{ url_for('admin.staff', role=role) }}">{{ role }} · {{ counts.get(role, 0) }}</a>
+  {% endfor %}
+  <a class="chip {{ 'active' if not request.args.get('role') }}" href="{{ url_for('admin.staff') }}">All</a>
+</div>
+
+<section class="card" data-anim>
+  <div class="card-head">
+    <h3>{{ icon('users-round') }} Staff members</h3>
+    <form class="filters" method="get" action="{{ url_for('admin.staff') }}">
+      <input type="search" name="q" value="{{ q }}" placeholder="Name, phone or email…" aria-label="Search staff">
+      <button class="btn btn-outline btn-sm" type="submit">{{ icon('search', 'i-sm') }} Search</button>
+      {% if q or role %}<a class="btn btn-ghost btn-sm" href="{{ url_for('admin.staff') }}">Reset</a>{% endif %}
+    </form>
+  </div>
+
+  {% if rows %}
+  <div class="table-wrap">
+    <table class="data">
+      <thead><tr><th>Name</th><th>Role</th><th>Contact</th><th>Shift</th><th>Joined</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        {% for s in rows %}
+        <tr>
+          <td>
+            <div class="row">
+              <span class="avatar sm">{{ s.initials }}</span>
+              <div>
+                <div class="t-title">{{ s.full_name }}</div>
+                <div class="t-sub">{{ s.notes or '—' }}</div>
+              </div>
+            </div>
+          </td>
+          <td>{{ badge(s.role, 'brand') }}</td>
+          <td class="tiny">{{ s.phone or '—' }}<div class="t-sub">{{ s.email or '' }}</div></td>
+          <td class="tiny">{{ s.shift or '—' }}</td>
+          <td class="tiny">{{ s.joined_on|date if s.joined_on else '—' }}</td>
+          <td>{{ status_badge(s.status) }}</td>
+          <td>
+            <div class="table-actions">
+              <button class="btn btn-ghost btn-sm" title="Edit"
+                      data-modal-open="staffModal"
+                      data-field-staff_id="{{ s.id }}"
+                      data-field-full_name="{{ s.full_name }}"
+                      data-field-role="{{ s.role }}"
+                      data-field-phone="{{ s.phone or '' }}"
+                      data-field-email="{{ s.email or '' }}"
+                      data-field-shift="{{ s.shift or '' }}"
+                      data-field-status="{{ s.status }}"
+                      data-field-notes="{{ s.notes or '' }}">{{ icon('pencil', 'i-sm') }}</button>
+              <form method="post" action="{{ url_for('admin.staff_toggle', staff_id=s.id) }}" data-confirm="Change employment status for {{ s.full_name }}?">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-ghost btn-sm" type="submit" title="Toggle status">{{ icon('power', 'i-sm') }}</button>
+              </form>
+              <form method="post" action="{{ url_for('admin.staff_delete', staff_id=s.id) }}" data-confirm="Remove {{ s.full_name }} from the staff list?">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-ghost btn-sm" type="submit" title="Delete">{{ icon('trash-2', 'i-sm') }}</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    {{ empty('user-cog', 'No staff added yet', 'Add wardens, security and maintenance staff so residents know who to contact.') }}
+  {% endif %}
+</section>
+
+<dialog class="modal" id="staffModal">
+  <form method="post" action="{{ url_for('admin.staff') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="staff_id" value="">
+    <div class="modal-head">
+      <h3>{{ icon('user-cog') }} Staff member</h3>
+      <button class="icon-btn" type="button" data-modal-close>{{ icon('x') }}</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="field full">
+          <label for="full_name">Full name <span class="req">*</span></label>
+          <input id="full_name" type="text" name="full_name" required minlength="3" maxlength="120">
+        </div>
+        <div class="field">
+          <label for="role">Role <span class="req">*</span></label>
+          <select id="role" name="role" required>{% for r in roles %}<option value="{{ r }}">{{ r }}</option>{% endfor %}</select>
+        </div>
+        <div class="field">
+          <label for="status">Employment status</label>
+          <select id="status" name="status">
+            <option value="Active">Active</option>
+            <option value="On Leave">On leave</option>
+            <option value="Inactive">Inactive</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="phone">Phone</label>
+          <input id="phone" type="tel" name="phone" maxlength="20" placeholder="+91 …">
+        </div>
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" type="email" name="email" maxlength="190">
+        </div>
+        <div class="field">
+          <label for="shift">Shift</label>
+          <input id="shift" type="text" name="shift" maxlength="40" placeholder="Morning / Night / Rotational">
+        </div>
+        <div class="field">
+          <label for="joined_on">Joined on</label>
+          <input id="joined_on" type="date" name="joined_on" value="{{ today.isoformat() }}">
+        </div>
+        <div class="field full">
+          <label for="notes">Notes</label>
+          <input id="notes" type="text" name="notes" maxlength="255" placeholder="Responsibility area, remarks">
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" type="button" data-modal-close>Cancel</button>
+      <button class="btn btn-primary" type="submit">{{ icon('save', 'i-sm') }} Save staff</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}

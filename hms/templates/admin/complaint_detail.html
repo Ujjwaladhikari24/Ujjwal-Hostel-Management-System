@@ -1,0 +1,117 @@
+{% extends "dashboard_base.html" %}
+{% from 'partials/macros.html' import icon, status_badge, badge, avatar %}
+{% block title %}{{ complaint.ticket_no }} — {{ hostel_name }}{% endblock %}
+{% block page_title %}Complaint {{ complaint.ticket_no }}{% endblock %}
+{% block page_sub %}{{ complaint.category }} · {{ complaint.student.user.name }}{% endblock %}
+
+{% block page_header %}
+<div class="page-head">
+  <div>
+    <div class="breadcrumb"><a href="{{ url_for('admin.complaints') }}">Complaints</a> {{ icon('chevron-right') }} <span>{{ complaint.ticket_no }}</span></div>
+    <h1>{{ complaint.subject }}</h1>
+    <p>Raised {{ complaint.created_at|dt }} · {{ complaint.priority }} priority</p>
+  </div>
+  <div class="page-actions">{{ status_badge(complaint.status) }}</div>
+</div>
+{% endblock %}
+
+{% block page_content %}
+<div class="grid-2-1" style="align-items:start">
+  <div class="stack">
+    <section class="card" data-anim>
+      <div class="card-head"><h3>{{ icon('message-square') }} Thread</h3><span class="badge muted">{{ complaint.responses|length }} response(s)</span></div>
+      <div class="card-body">
+        <div class="chat">
+          <div class="bubble student">
+            <strong>{{ complaint.student.user.name }} · {{ badge(complaint.category, 'brand') }}</strong>
+            <div style="margin-top:.35rem">{{ complaint.description|nl2br }}</div>
+            {% if complaint.attachment %}
+            <div style="margin-top:.5rem">
+              <a class="btn btn-ghost btn-sm" href="{{ url_for('static', filename=complaint.attachment) }}" target="_blank" rel="noopener">{{ icon('paperclip', 'i-sm') }} Open attachment</a>
+            </div>
+            {% endif %}
+            <div class="b-meta">{{ complaint.created_at|dt }}</div>
+          </div>
+          {% for r in complaint.responses %}
+          <div class="bubble {{ 'admin' if r.author and r.author.role == 'admin' else 'student' }}">
+            <strong>{{ r.author.name if r.author else 'Hostel office' }}{% if r.author and r.author.role == 'admin' %} · Administration{% endif %}</strong>
+            <div style="margin-top:.35rem">{{ r.message|nl2br }}</div>
+            <div class="b-meta">{{ r.created_at|dt }}</div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <form method="post" style="margin-top:1.2rem">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="action" value="respond">
+          <div class="field">
+            <label for="message">Respond to the student</label>
+            <textarea id="message" name="message" maxlength="2000" placeholder="Explain what was done, or ask for more detail…"></textarea>
+            <span class="hint">Your reply is delivered as an in-app notification plus a message on the thread.</span>
+          </div>
+          <div class="form-grid">
+            <div class="field">
+              <label for="status">Update status</label>
+              <select id="status" name="status">
+                {% for s in statuses %}<option value="{{ s }}" {{ 'selected' if complaint.status == s }}>{{ s }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="field" style="align-self:end">
+              <button class="btn btn-primary btn-block" type="submit">{{ icon('send', 'i-sm') }} Save response</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="card card-pad" data-anim>
+      <h3 style="font-size:.96rem">{{ icon('user-round') }} Raised by</h3>
+      <div class="row" style="gap:.7rem;margin-bottom:.8rem">
+        {{ avatar(complaint.student.user) }}
+        <div>
+          <div style="font-weight:700">{{ complaint.student.user.name }}</div>
+          <div class="tiny muted">{{ complaint.student.enrollment_no }}</div>
+        </div>
+      </div>
+      <div class="info-list">
+        <div class="info-row"><span class="k">Room</span><span class="v">{{ complaint.student.room.room_number if complaint.student.room else 'Not allocated' }}</span></div>
+        <div class="info-row"><span class="k">Phone</span><span class="v">{{ complaint.student.user.phone or '—' }}</span></div>
+        <div class="info-row"><span class="k">Email</span><span class="v" style="max-width:60%;word-break:break-all">{{ complaint.student.user.email }}</span></div>
+      </div>
+      <a class="btn btn-outline btn-block btn-sm" style="margin-top:.8rem" href="{{ url_for('admin.student_detail', student_id=complaint.student.id) }}">{{ icon('arrow-up-right', 'i-sm') }} Open student profile</a>
+    </section>
+
+    <section class="card card-pad" data-anim>
+      <h3 style="font-size:.96rem">{{ icon('info') }} Ticket</h3>
+      <div class="info-list">
+        <div class="info-row"><span class="k">Ticket no.</span><span class="v mono">{{ complaint.ticket_no }}</span></div>
+        <div class="info-row"><span class="k">Category</span><span class="v">{{ complaint.category }}</span></div>
+        <div class="info-row"><span class="k">Priority</span><span class="v">{{ complaint.priority }}</span></div>
+        <div class="info-row"><span class="k">Raised</span><span class="v">{{ complaint.created_at|dt }}</span></div>
+        <div class="info-row"><span class="k">Updated</span><span class="v">{{ complaint.updated_at|dt }}</span></div>
+        <div class="info-row"><span class="k">Resolved in</span><span class="v">{{ complaint.resolution_hours ~ ' h' if complaint.resolution_hours else '—' }}</span></div>
+      </div>
+    </section>
+
+    <section class="card card-pad" data-anim>
+      <h3 style="font-size:.96rem">{{ icon('zap') }} Quick status</h3>
+      <div class="stack-sm">
+        {% for s in statuses %}
+        <form method="post">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="action" value="status">
+          <input type="hidden" name="status" value="{{ s }}">
+          <button class="btn btn-block btn-sm {{ 'btn-primary' if complaint.status == s else 'btn-outline' }}" type="submit"
+                  {{ 'disabled' if complaint.status == s }}>
+            {{ icon('check-circle-2', 'i-sm') }} Mark {{ s }}
+          </button>
+        </form>
+        {% endfor %}
+      </div>
+      <p class="tiny muted" style="margin:.7rem 0 0">Students are notified in-app every time the status changes.</p>
+    </section>
+  </div>
+</div>
+{% endblock %}

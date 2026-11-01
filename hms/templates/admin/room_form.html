@@ -1,0 +1,92 @@
+{% extends "dashboard_base.html" %}
+{% from 'partials/macros.html' import icon %}
+{% set editing = room is defined and room %}
+{% block title %}{{ 'Edit' if editing else 'Add' }} Room — {{ hostel_name }}{% endblock %}
+{% block page_title %}{{ 'Edit room' if editing else 'Add room' }}{% endblock %}
+{% block page_sub %}{{ ('Room ' ~ room.room_number) if editing else 'New room in the inventory' }}{% endblock %}
+
+{% block page_header %}
+<div class="page-head">
+  <div>
+    <div class="breadcrumb"><a href="{{ url_for('admin.rooms') }}">Rooms</a> {{ icon('chevron-right') }} <span>{{ 'Edit' if editing else 'New' }}</span></div>
+    <h1>{{ 'Edit room details' if editing else 'Add a room' }}</h1>
+    <p>Capacity, type and fee drive allocation safety and billing reports.</p>
+  </div>
+  <div class="page-actions"><a class="btn btn-ghost" href="{{ url_for('admin.rooms') }}">{{ icon('arrow-left') }} Back to rooms</a></div>
+</div>
+{% endblock %}
+
+{% block page_content %}
+<form method="post" action="{{ url_for('admin.room_edit', room_id=room.id) if editing else url_for('admin.room_new') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="grid-2-1" style="align-items:start">
+    <section class="card">
+      <div class="card-head"><h3>{{ icon('door-open') }} Room details</h3></div>
+      <div class="card-body">
+        <div class="form-grid">
+          <div class="field">
+            <label for="room_number">Room number <span class="req">*</span></label>
+            <input id="room_number" type="text" name="room_number" value="{{ form.get('room_number','') }}" required maxlength="20" placeholder="e.g. A-204">
+          </div>
+          <div class="field">
+            <label for="block">Block / wing</label>
+            <input id="block" type="text" name="block" value="{{ form.get('block','') }}" maxlength="40" placeholder="e.g. Block A">
+          </div>
+          <div class="field">
+            <label for="floor">Floor <span class="req">*</span></label>
+            <input id="floor" type="number" name="floor" value="{{ form.get('floor', 0) }}" min="0" max="30" required>
+          </div>
+          <div class="field">
+            <label for="room_type">Room type <span class="req">*</span></label>
+            <select id="room_type" name="room_type" required>
+              {% for t in room_types %}<option value="{{ t }}" {{ 'selected' if form.get('room_type') == t }}>{{ t }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label for="capacity">Bed capacity <span class="req">*</span></label>
+            <input id="capacity" type="number" name="capacity" value="{{ form.get('capacity', 2) }}" min="1" max="8" required>
+            <span class="hint">Matches the sharing type — 1, 2, 3 or 4 beds typically.</span>
+          </div>
+          <div class="field">
+            <label for="fee_per_semester">Fee per semester (₹) <span class="req">*</span></label>
+            <input id="fee_per_semester" type="number" name="fee_per_semester" value="{{ form.get('fee_per_semester', '') }}" min="1" step="1" required>
+          </div>
+          <div class="field">
+            <label for="status">Availability</label>
+            <select id="status" name="status">
+              <option value="Available" {{ 'selected' if form.get('status') != 'Maintenance' }}>Available for allocation</option>
+              <option value="Maintenance" {{ 'selected' if form.get('status') == 'Maintenance' }}>Under maintenance (blocks allocation)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="amenities">Amenities</label>
+            <input id="amenities" type="text" name="amenities" value="{{ form.get('amenities','') }}" maxlength="255" placeholder="Attached bath, AC, balcony…">
+          </div>
+          <div class="field full">
+            <label for="notes">Internal notes</label>
+            <textarea id="notes" name="notes" maxlength="1000" placeholder="Anything the maintenance team should know">{{ form.get('notes','') }}</textarea>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="stack">
+      <section class="card card-pad">
+        <h3 style="font-size:.96rem">{{ icon('alert-triangle') }} Occupancy safety</h3>
+        <p class="tiny muted">Allocation is blocked when a room's beds are filled. Capacity can never be reduced below the number of residents currently living there.</p>
+        {% if editing %}
+        <div class="info-list">
+          <div class="info-row"><span class="k">Occupied beds</span><span class="v">{{ room.occupied_beds }} / {{ room.capacity }}</span></div>
+          <div class="info-row"><span class="k">Free beds</span><span class="v">{{ room.free_beds }}</span></div>
+          <div class="info-row"><span class="k">Live status</span><span class="v">{{ room.live_status }}</span></div>
+        </div>
+        {% endif %}
+      </section>
+      <section class="card card-pad">
+        <button class="btn btn-primary btn-block" type="submit">{{ icon('save') }} {{ 'Save room' if editing else 'Create room' }}</button>
+        <a class="btn btn-ghost btn-block" style="margin-top:.5rem" href="{{ url_for('admin.rooms') }}">Cancel</a>
+      </section>
+    </div>
+  </div>
+</form>
+{% endblock %}

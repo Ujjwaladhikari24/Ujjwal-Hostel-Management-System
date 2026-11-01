@@ -1,0 +1,47 @@
+{% extends "dashboard_base.html" %}
+{% from 'partials/macros.html' import icon, badge, empty %}
+{% block title %}Notifications — {{ hostel_name }}{% endblock %}
+{% block page_title %}Notifications{% endblock %}
+{% block page_sub %}In-app alerts about your hostel account{% endblock %}
+
+{% block page_content %}
+<div class="page-head">
+  <div><h1>My notifications</h1><p>Allocations, fees and complaint updates are delivered here inside the portal.</p></div>
+  <form method="post" action="{{ url_for('auth.read_all_notifications') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button class="btn btn-outline" type="submit">{{ icon('check-check') }} Mark all read</button>
+  </form>
+</div>
+
+<section class="card" data-anim>
+  {% if rows %}
+  <div class="card-body stack-sm">
+    {% for n in rows %}
+    <div class="row-between {{ '' if n.is_read else 'unread' }}" style="padding:.7rem .6rem;border-radius:12px;{{ '' if n.is_read else 'background:rgba(47,75,255,.05)' }}">
+      <div class="row" style="align-items:flex-start">
+        <span class="tl-icon" style="width:36px;height:36px;border-radius:11px;display:grid;place-items:center;background:var(--grad-brand);color:#fff">{{ icon(n.icon or 'bell') }}</span>
+        <div>
+          <div style="font-weight:650;font-size:.88rem">{{ n.title }}</div>
+          <div class="tiny muted">{{ n.message }}</div>
+          <div class="tiny muted">{{ n.created_at|dt }}</div>
+        </div>
+      </div>
+      <div class="row" style="gap:.4rem">
+        {{ badge('Unread' if not n.is_read else 'Read', 'warn' if not n.is_read else 'muted') }}
+        {% if n.link %}<a class="btn btn-ghost btn-sm" href="{{ n.link }}">Open</a>{% endif %}
+        {% if not n.is_read %}
+        <form method="post" action="{{ url_for('auth.read_notification', notif_id=n.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-ghost btn-sm" type="submit" title="Mark as read">{{ icon('check', 'i-sm') }}</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+    {% if not loop.last %}<hr class="sep" style="margin:.1rem 0">{% endif %}
+    {% endfor %}
+  </div>
+  {% else %}
+    {{ empty('bell-off', 'Nothing here yet', 'Notifications about your room, fees and complaints will show up on this page.') }}
+  {% endif %}
+</section>
+{% endblock %}

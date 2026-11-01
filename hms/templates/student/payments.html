@@ -1,0 +1,56 @@
+{% extends "dashboard_base.html" %}
+{% from 'partials/macros.html' import icon, status_badge, empty, badge %}
+{% block title %}Payment History — {{ hostel_name }}{% endblock %}
+{% block page_title %}Payment history{% endblock %}
+{% block page_sub %}Receipts recorded by the hostel office{% endblock %}
+
+{% block page_header %}
+<div class="page-head">
+  <div>
+    <div class="breadcrumb"><a href="{{ url_for('student.fees') }}">Fee details</a> {{ icon('chevron-right') }} <span>Payment history</span></div>
+    <h1>Payments &amp; receipts</h1>
+    <p>{{ payments|length }} recorded payment(s) · ₹{{ '{:,.0f}'.format(total_paid) }} received</p>
+  </div>
+  <div class="page-actions">
+    <a class="btn btn-primary" href="{{ url_for('student.fees') }}">{{ icon('receipt-indian-rupee') }} View dues</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_content %}
+<div class="stat-strip" data-anim>
+  <div class="stat-mini"><div class="l">Total paid</div><div class="v" style="color:#047857">₹{{ '{:,.0f}'.format(total_paid) }}</div></div>
+  <div class="stat-mini"><div class="l">Receipts issued</div><div class="v">{{ payments|length }}</div></div>
+  <div class="stat-mini"><div class="l">Outstanding balance</div><div class="v" style="color:{{ '#dc2626' if balance > 0 else '#047857' }}">₹{{ '{:,.0f}'.format(balance) }}</div></div>
+</div>
+
+<section class="card" data-anim>
+  <div class="card-head"><h3>{{ icon('history') }} All payments</h3></div>
+  {% if payments %}
+  <div class="table-wrap">
+    <table class="data">
+      <thead>
+        <tr><th>Receipt no.</th><th>Date</th><th>Fee head</th><th>Method</th><th>Reference</th><th class="num">Amount</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for p in payments %}
+        <tr>
+          <td class="mono tiny">{{ p.receipt_no }}</td>
+          <td>{{ p.paid_on|date }}</td>
+          <td class="t-title">{{ p.fee_record.title if p.fee_record else 'General payment' }}
+            <div class="t-sub">Recorded by {{ p.recorder.name if p.recorder else 'hostel office' }}</div>
+          </td>
+          <td>{{ badge(p.method, 'brand') }}</td>
+          <td class="tiny muted">{{ p.reference or '—' }}</td>
+          <td class="num" style="font-weight:700">₹{{ '{:,.0f}'.format(p.amount) }}</td>
+          <td class="right"><a class="btn btn-outline btn-sm" href="{{ url_for('student.receipt', payment_id=p.id) }}">{{ icon('file-text', 'i-sm') }} Receipt</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    {{ empty('wallet', 'No payments recorded', 'Once the office records a payment against your account, the receipt appears here with a printable copy.') }}
+  {% endif %}
+</section>
+{% endblock %}

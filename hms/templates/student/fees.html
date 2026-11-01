@@ -1,0 +1,86 @@
+{% extends "dashboard_base.html" %}
+{% from 'partials/macros.html' import icon, status_badge, empty, progress, badge %}
+{% block title %}Fee Details — {{ hostel_name }}{% endblock %}
+{% block page_title %}Fee details{% endblock %}
+{% block page_sub %}Invoices, dues and payment status{% endblock %}
+
+{% block page_header %}
+<div class="page-head">
+  <div>
+    <div class="breadcrumb"><a href="{{ url_for('student.dashboard') }}">Dashboard</a> {{ icon('chevron-right') }} <span>Fee details</span></div>
+    <h1>Hostel fees</h1>
+    <p>Everything the hostel office has billed to your account.</p>
+  </div>
+  <div class="page-actions">
+    <a class="btn btn-outline" href="{{ url_for('student.payments') }}">{{ icon('history') }} Payment history</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_content %}
+<div class="alert info">
+  {{ icon('info') }}
+  <div>
+    <strong>How payments work here.</strong> This portal does not process online payments.
+    Pay at the hostel office by cash, UPI or bank transfer — the accounts staff record it against
+    your name and a receipt appears instantly in your payment history.
+  </div>
+</div>
+
+<div class="stat-strip" data-anim>
+  <div class="stat-mini"><div class="l">Total billed</div><div class="v">₹{{ '{:,.0f}'.format(stats.total_billed) }}</div></div>
+  <div class="stat-mini"><div class="l">Amount paid</div><div class="v" style="color:#047857">₹{{ '{:,.0f}'.format(stats.total_paid) }}</div></div>
+  <div class="stat-mini"><div class="l">Remaining balance</div><div class="v" style="color:{{ '#dc2626' if stats.balance > 0 else '#047857' }}">₹{{ '{:,.0f}'.format(stats.balance) }}</div></div>
+  <div class="stat-mini"><div class="l">Overdue invoices</div><div class="v">{{ stats.overdue_count }}</div></div>
+  <div class="stat-mini"><div class="l">Payment status</div><div class="v">{{ student.fee_status }}</div></div>
+</div>
+
+<div style="margin-top:.35rem">
+  <div class="row-between tiny muted" style="margin-bottom:.4rem">
+    <span>Payment progress</span>
+    <span>{{ (stats.total_paid * 100 / stats.total_billed)|round|int if stats.total_billed else 0 }}% of billed amount settled</span>
+  </div>
+  {{ progress((stats.total_paid * 100 / stats.total_billed) if stats.total_billed else 0, 'teal') }}
+</div>
+
+<section class="card" data-anim>
+  <div class="card-head">
+    <h3>{{ icon('receipt-indian-rupee') }} Fee invoices</h3>
+    <span class="badge muted">{{ records|length }} record(s)</span>
+  </div>
+  {% if records %}
+  <div class="table-wrap">
+    <table class="data">
+      <thead>
+        <tr><th>Fee head</th><th>Semester</th><th>Due date</th><th class="num">Amount</th><th class="num">Paid</th><th class="num">Balance</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        {% for f in records %}
+        <tr>
+          <td class="t-title">{{ f.title }}{% if f.description %}<div class="t-sub">{{ f.description }}</div>{% endif %}</td>
+          <td>{{ f.semester or '—' }}</td>
+          <td>{{ f.due_date|date }}</td>
+          <td class="num">₹{{ '{:,.0f}'.format(f.amount) }}</td>
+          <td class="num">₹{{ '{:,.0f}'.format(f.paid_amount) }}</td>
+          <td class="num" style="font-weight:700;color:{{ '#dc2626' if f.balance > 0 else '#047857' }}">₹{{ '{:,.0f}'.format(f.balance) }}</td>
+          <td>{{ status_badge(f.status) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    {{ empty('receipt', 'No fees assigned yet', 'When the hostel office raises a fee for your account it appears here with the amount and due date.') }}
+  {% endif %}
+</section>
+
+<section class="card card-pad" data-anim>
+  <div class="row-between">
+    <div>
+      <h3 style="font-size:.98rem;margin:0">{{ icon('circle-help') }} Late payment policy</h3>
+      <p class="tiny muted" style="margin:.35rem 0 0">{{ late_fee_note or 'Please pay fees by the notified due date.' }}</p>
+    </div>
+    <a class="btn btn-outline btn-sm" href="{{ url_for('student.rules') }}">Hostel rules</a>
+  </div>
+</section>
+{% endblock %}

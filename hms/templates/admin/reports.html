@@ -1,0 +1,175 @@
+{% extends "dashboard_base.html" %}
+{% from 'partials/macros.html' import icon, kpi, badge, empty %}
+{% block title %}Reports &amp; Analytics — {{ hostel_name }}{% endblock %}
+{% block page_title %}Reports &amp; analytics{% endblock %}
+{% block page_sub %}All figures computed live from hostel records{% endblock %}
+
+{% block page_header %}
+<div class="page-head">
+  <div>
+    <div class="breadcrumb"><a href="{{ url_for('admin.overview') }}">Overview</a> {{ icon('chevron-right') }} <span>Reports</span></div>
+    <h1>Reports &amp; analytics</h1>
+    <p>Occupancy, fee collection, pending dues and complaint performance.</p>
+  </div>
+  <div class="page-actions">
+    <button class="btn btn-outline" onclick="window.print()">{{ icon('printer', 'i-sm') }} Print</button>
+    <a class="btn btn-outline" href="{{ url_for('admin.export_csv', kind='rooms') }}">{{ icon('download', 'i-sm') }} Rooms</a>
+    <a class="btn btn-outline" href="{{ url_for('admin.export_csv', kind='payments') }}">{{ icon('download', 'i-sm') }} Payments</a>
+    <a class="btn btn-primary" href="{{ url_for('admin.export_csv', kind='dues') }}">{{ icon('download', 'i-sm') }} Pending dues</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_content %}
+<div class="kpi-grid">
+  {{ kpi('brand', 'percent', 'Occupancy', stats.occupancy_pct ~ '%', stats.occupied_beds ~ ' of ' ~ stats.capacity ~ ' beds') }}
+  {{ kpi('green', 'wallet', 'Fee collection', '₹' ~ '{:,.0f}'.format(stats.collected), stats.collection_pct ~ '% of billed') }}
+  {{ kpi('sunset', 'alert-circle', 'Outstanding dues', '₹' ~ '{:,.0f}'.format(stats.outstanding), stats.students_with_dues ~ ' students') }}
+  {{ kpi('teal', 'timer', 'Avg. resolution', (avg_hours ~ ' h') if payment_count or avg_hours else '0 h', 'complaint turnaround') }}
+</div>
+
+<div class="grid-2" style="align-items:start">
+  <section class="card" data-anim>
+    <div class="card-head"><h3>{{ icon('trending-up') }} Collection vs billing</h3></div>
+    <div class="card-body"><div class="chart-box h-260"><canvas id="collectionChart"></canvas></div></div>
+  </section>
+
+  <section class="card" data-anim>
+    <div class="card-head"><h3>{{ icon('credit-card') }} Collections by method</h3></div>
+    <div class="card-body">
+      {% if by_method %}
+        <div class="chart-box h-260"><canvas id="methodChart"></canvas></div>
+      {% else %}
+        <p class="tiny muted">No payments recorded yet.</p>
+      {% endif %}
+    </div>
+  </section>
+</div>
+
+<section class="card" data-anim>
+  <div class="card-head">
+    <h3>{{ icon('building-2') }} Occupancy by room type</h3>
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.export_csv', kind='rooms') }}">{{ icon('download', 'i-sm') }} CSV</a>
+  </div>
+  {% if type_rows %}
+  <div class="table-wrap">
+    <table class="data">
+      <thead><tr><th>Room type</th><th class="num">Rooms</th><th class="num">Beds</th><th class="num">Occupied</th><th class="num">Free</th><th>Occupancy</th><th class="num">Billed value</th></tr></thead>
+      <tbody>
+        {% for t in type_rows %}
+        <tr>
+          <td class="t-title">{{ t.type }}</td>
+          <td class="num">{{ t.rooms }}</td>
+          <td class="num">{{ t.capacity }}</td>
+          <td class="num">{{ t.occupied }}</td>
+          <td class="num" style="color:#047857;font-weight:700">{{ t.free }}</td>
+          <td style="min-width:140px">
+            <div class="row" style="gap:.5rem">
+              <div class="progress" style="flex:1"><span style="width: {{ (t.occupied * 100 / t.capacity)|round|int if t.capacity else 0 }}%"></span></div>
+              <span class="tiny">{{ (t.occupied * 100 / t.capacity)|round|int if t.capacity else 0 }}%</span>
+            </div>
+          </td>
+          <td class="num">₹{{ '{:,.0f}'.format(t.revenue_billed) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    {{ empty('building-2', 'No rooms to report on', 'Add rooms from Room Management to populate this report.') }}
+  {% endif %}
+</section>
+
+<div class="grid-2" style="align-items:start">
+  <section class="card" data-anim>
+    <div class="card-head">
+      <h3>{{ icon('alert-circle') }} Top pending dues</h3>
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.export_csv', kind='dues') }}">Export</a>
+    </div>
+    {% if dues %}
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th>Student</th><th>Room</th><th class="num">Balance</th><th class="num">% paid</th></tr></thead>
+        <tbody>
+          {% for s in dues %}
+          <tr>
+            <td class="t-title">{{ s.user.name }}<div class="t-sub">{{ s.enrollment_no }}</div></td>
+            <td>{{ s.room.room_number if s.room else '—' }}</td>
+            <td class="num" style="font-weight:700;color:#dc2626">₹{{ '{:,.0f}'.format(s.balance) }}</td>
+            <td class="num">{{ (s.total_paid * 100 / s.total_billed)|round|int if s.total_billed else 0 }}%</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <div class="card-body"><p class="tiny muted" style="margin:0">No outstanding dues — every assigned fee is settled.</p></div>
+    {% endif %}
+  </section>
+
+  <section class="card" data-anim>
+    <div class="card-head"><h3>{{ icon('message-square-warning') }} Complaint performance</h3></div>
+    <div class="card-body">
+      <div class="chart-box h-200"><canvas id="complaintReportChart"></canvas></div>
+      <div class="stat-strip" style="margin-top:1rem">
+        {% for s, c in status_counts.items() %}
+        <div class="stat-mini"><div class="l">{{ s }}</div><div class="v">{{ c }}</div></div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+</div>
+
+<section class="card" data-anim>
+  <div class="card-head"><h3>{{ icon('file-spreadsheet') }} Data exports</h3></div>
+  <div class="card-body quick-grid">
+    <a class="tile-link" href="{{ url_for('admin.export_csv', kind='students') }}"><span class="tl-icon" style="background:var(--grad-brand)">{{ icon('users-round') }}</span><span><span class="tl-title">Students</span><br><span class="tl-sub">With room &amp; balance</span></span></a>
+    <a class="tile-link" href="{{ url_for('admin.export_csv', kind='payments') }}"><span class="tl-icon" style="background:var(--grad-teal)">{{ icon('wallet') }}</span><span><span class="tl-title">Payments</span><br><span class="tl-sub">All receipts</span></span></a>
+    <a class="tile-link" href="{{ url_for('admin.export_csv', kind='dues') }}"><span class="tl-icon" style="background:var(--grad-sunset)">{{ icon('alert-circle') }}</span><span><span class="tl-title">Pending dues</span><br><span class="tl-sub">Outstanding balances</span></span></a>
+    <a class="tile-link" href="{{ url_for('admin.export_csv', kind='rooms') }}"><span class="tl-icon" style="background:var(--grad-orange)">{{ icon('building-2') }}</span><span><span class="tl-title">Rooms</span><br><span class="tl-sub">Capacity &amp; occupancy</span></span></a>
+    <a class="tile-link" href="{{ url_for('admin.export_csv', kind='complaints') }}"><span class="tl-icon" style="background:linear-gradient(135deg,#7c3aed,#ec4899)">{{ icon('message-square-warning') }}</span><span><span class="tl-title">Complaints</span><br><span class="tl-sub">Status &amp; resolution time</span></span></a>
+    <a class="tile-link" href="{{ url_for('admin.export_csv', kind='allocations') }}"><span class="tl-icon" style="background:linear-gradient(135deg,#0ea5e9,#06b6d4)">{{ icon('bed-double') }}</span><span><span class="tl-title">Allocations</span><br><span class="tl-sub">Bed history log</span></span></a>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  HMS_CHART('collectionChart', {
+    data: {
+      labels: {{ month_labels|tojson }},
+      datasets: [
+        { type: 'bar', label: 'Collected', data: {{ month_collected|tojson }}, backgroundColor: 'rgba(16,185,129,.85)' },
+        { type: 'line', label: 'Billed', data: {{ month_billed|tojson }}, borderColor: '#2f4bff', fill: false }
+      ]
+    },
+    plugins: { legend: { display: true } },
+    scales: {
+      x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+      y: { beginAtZero: true, grid: {}, ticks: { font: { size: 11 }, callback: function (v) { return v >= 1000 ? '₹' + Math.round(v / 1000) + 'k' : '₹' + v; } } }
+    }
+  });
+
+  {% if by_method %}
+  HMS_CHART('methodChart', {
+    type: 'doughnut',
+    data: {
+      labels: {{ method_labels|tojson }},
+      datasets: [{ data: {{ method_values|tojson }}, backgroundColor: ['#2f4bff', '#06b6d4', '#f97316', '#7c3aed'], borderWidth: 3, borderColor: '#fff' }]
+    },
+    options: { cutout: '60%', plugins: { legend: { display: true, position: 'bottom' } } }
+  });
+  {% endif %}
+
+  {% if cat_labels %}
+  HMS_CHART('complaintReportChart', {
+    type: 'bar',
+    data: {
+      labels: {{ cat_labels|tojson }},
+      datasets: [{ label: 'Complaints', data: {{ cat_values|tojson }}, backgroundColor: '#7c3aed', borderRadius: 8 }]
+    },
+    options: { scales: { x: { grid: { display: false }, ticks: { font: { size: 10 } } }, y: { beginAtZero: true, grid: {}, ticks: { precision: 0 } } }, plugins: { legend: { display: false } } }
+  });
+  {% endif %}
+</script>
+{% endblock %}

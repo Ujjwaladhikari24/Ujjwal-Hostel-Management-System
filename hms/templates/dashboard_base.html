@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% from 'partials/macros.html' import icon, logo, avatar %}
+
+{% block body_class %}app-body{% endblock %}
+
+{% block content %}
+<div class="app-shell">
+  {% if current_user.role == 'admin' %}
+    {% include 'partials/sidebar_admin.html' %}
+  {% else %}
+    {% include 'partials/sidebar_student.html' %}
+  {% endif %}
+
+  <div class="app-main">
+    <header class="topbar">
+      <button class="icon-btn menu-toggle" data-nav-toggle type="button" aria-label="Toggle navigation">{{ icon('menu', 'i-lg') }}</button>
+      <div class="page-title">
+        {% block page_title %}Dashboard{% endblock %}
+        <small>{% block page_sub %}{{ hostel_name }} &middot; {{ academic_session }}{% endblock %}</small>
+      </div>
+
+      <form class="topbar-search" role="search"
+            action="{{ url_for('admin.students') if current_user.role == 'admin' else url_for('student.complaints') }}" method="get">
+        {{ icon('search') }}
+        <input type="search" name="q" placeholder="{{ 'Search students…' if current_user.role == 'admin' else 'Search my complaints…' }}" aria-label="Search">
+      </form>
+
+      <button class="icon-btn" data-theme-toggle type="button" aria-label="Toggle dark mode" title="Light / dark mode"><i data-lucide="moon" class="i-lg" data-theme-icon></i></button>
+
+      <div class="dropdown">
+        <button class="icon-btn" data-dropdown type="button" aria-label="Notifications">
+          {{ icon('bell', 'i-lg') }}
+          {% if nav_notification_count %}<span class="dot-badge">{{ nav_notification_count }}</span>{% endif %}
+        </button>
+        <div class="dropdown-panel">
+          <div class="dropdown-head">
+            <span>Notifications</span>
+            <span class="badge brand">{{ nav_notification_count|default(0) }} new</span>
+          </div>
+          {% for n in nav_notifications|default([]) %}
+            <form method="post" action="{{ url_for('auth.read_notification', notif_id=n.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="dropdown-item unread" type="submit">
+                {{ icon(n.icon or 'bell') }}
+                <span>
+                  <strong>{{ n.title }}</strong>
+                  {{ n.message or '' }}
+                  <span class="tiny muted">{{ n.created_at|ago }}</span>
+                </span>
+              </button>
+            </form>
+          {% else %}
+            <div class="dropdown-item" style="cursor:default">
+              {{ icon('bell-off') }}
+              <span><strong>No new notifications</strong>You are all caught up.</span>
+            </div>
+          {% endfor %}
+          <div class="dropdown-foot">
+            <a class="dropdown-item" href="{{ url_for('student.notifications') if current_user.role == 'student' else url_for('admin.activity') }}">
+              {{ icon('list-checks') }}<span>View all activity</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div class="dropdown">
+        <button class="row" data-dropdown type="button" style="background:none;border:0;cursor:pointer;padding:0" aria-label="Account menu">
+          {{ avatar(current_user, 'sm') }}
+          <span class="hide-sm" style="text-align:left;line-height:1.2">
+            <span style="display:block;font-size:.83rem;font-weight:650;color:var(--ink)">{{ current_user.name.split(' ')[0] }}</span>
+            <span class="tiny muted">{{ 'Administrator' if current_user.role == 'admin' else current_user.student.enrollment_no if current_user.student else 'Student' }}</span>
+          </span>
+          {{ icon('chevron-down', 'i-sm') }}
+        </button>
+        <div class="dropdown-panel narrow">
+          <div class="dropdown-item" style="cursor:default">
+            {{ avatar(current_user, 'sm') }}
+            <span><strong>{{ current_user.name }}</strong>{{ current_user.email }}</span>
+          </div>
+          <hr class="sep" style="margin:.4rem 0">
+          {% if current_user.role == 'admin' %}
+            <a class="dropdown-item" href="{{ url_for('admin.settings') }}">{{ icon('settings') }}<span>Settings</span></a>
+            <a class="dropdown-item" href="{{ url_for('admin.reports') }}">{{ icon('chart-pie') }}<span>Reports</span></a>
+          {% else %}
+            <a class="dropdown-item" href="{{ url_for('student.profile') }}">{{ icon('user-round') }}<span>My profile</span></a>
+            <a class="dropdown-item" href="{{ url_for('student.fees') }}">{{ icon('receipt-indian-rupee') }}<span>Fee details</span></a>
+          {% endif %}
+          <a class="dropdown-item" href="{{ url_for('public.home') }}">{{ icon('globe') }}<span>Public website</span></a>
+          <form method="post" action="{{ url_for('auth.logout') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="dropdown-item" type="submit">{{ icon('log-out') }}<span>Sign out</span></button>
+          </form>
+        </div>
+      </div>
+    </header>
+
+    <main class="page" id="main-content">
+      {% block page_header %}{% endblock %}
+      {% block page_content %}{% endblock %}
+    </main>
+  </div>
+</div>
+{% endblock %}
